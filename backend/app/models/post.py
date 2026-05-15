@@ -17,6 +17,7 @@ class Post(Base):
     platform_post_id: Mapped[str] = mapped_column(Text, nullable=False)
     post_url: Mapped[str] = mapped_column(Text, nullable=False)
     text_content: Mapped[str | None] = mapped_column(Text)
+    content_language: Mapped[str | None] = mapped_column(String(2), nullable=True)
     post_timestamp: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     engagement: Mapped[dict] = mapped_column(JSONB, default=dict)
