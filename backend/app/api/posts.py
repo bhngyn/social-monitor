@@ -13,13 +13,40 @@ from app.models.topic_set import SetMembership
 router = APIRouter()
 
 
+def _parse_uuid_csv(value: str | None, field_name: str) -> list[uuid.UUID]:
+    """Parse a comma-separated list of UUIDs. Raises 400 if any value is invalid."""
+    if not value:
+        return []
+    parsed: list[uuid.UUID] = []
+    for raw in value.split(","):
+        raw = raw.strip()
+        if not raw:
+            continue
+        try:
+            parsed.append(uuid.UUID(raw))
+        except (ValueError, TypeError) as exc:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid UUID '{raw}' in {field_name}: {exc}",
+            )
+    return parsed
+
+
+def _parse_csv(value: str | None) -> list[str]:
+    """Parse a generic comma-separated list of trimmed, non-empty strings."""
+    if not value:
+        return []
+    return [item.strip() for item in value.split(",") if item.strip()]
+
+
 @router.get("")
 async def list_posts(
     page: int = Query(1, ge=1),
     per_page: int = Query(20, ge=1, le=100),
-    platform: str | None = Query(None),
-    source_id: uuid.UUID | None = Query(None),
-    set_id: uuid.UUID | None = Query(None),
+    platform: str | None = Query(None, description="Single platform or comma-separated list"),
+    source_id: str | None = Query(None, description="Single UUID or comma-separated list (OR semantics)"),
+    set_id: str | None = Query(None, description="Single UUID or comma-separated list (OR semantics)"),
+    untagged: bool = Query(False, description="If true, return only posts with no set memberships"),
     q: str | None = Query(None),
     date_from: str | None = Query(None),
     date_to: str | None = Query(None),
@@ -28,22 +55,62 @@ async def list_posts(
     sort: str = Query("newest"),
     db: AsyncSession = Depends(get_db),
 ):
+    # Parse CSV params up-front so validation errors surface before any query work.
+    platforms = _parse_csv(platform)
+    source_ids = _parse_uuid_csv(source_id, "source_id")
+    set_ids = _parse_uuid_csv(set_id, "set_id")
+
+    # Decision: if both set_id and untagged=true are passed, the request is logically
+    # contradictory (asking for posts in specific sets AND posts in no set). Return an
+    # empty result set rather than 400 — keeps clients defensive code simpler and lets
+    # the UI render an empty state. Documented here so the choice is intentional.
+    if set_ids and untagged:
+        return {
+            "items": [],
+            "total": 0,
+            "page": page,
+            "per_page": per_page,
+        }
+
     query = select(Post).options(
         selectinload(Post.media_files),
         selectinload(Post.set_memberships),
     )
-    count_query = select(func.count(Post.id))
+    count_query = select(func.count(func.distinct(Post.id)))
 
     # Filters
-    if platform:
-        query = query.where(Post.platform == platform)
-        count_query = count_query.where(Post.platform == platform)
-    if source_id:
-        query = query.where(Post.source_id == source_id)
-        count_query = count_query.where(Post.source_id == source_id)
-    if set_id:
-        query = query.join(SetMembership).where(SetMembership.set_id == set_id)
-        count_query = count_query.join(SetMembership).where(SetMembership.set_id == set_id)
+    if platforms:
+        if len(platforms) == 1:
+            query = query.where(Post.platform == platforms[0])
+            count_query = count_query.where(Post.platform == platforms[0])
+        else:
+            query = query.where(Post.platform.in_(platforms))
+            count_query = count_query.where(Post.platform.in_(platforms))
+    if source_ids:
+        if len(source_ids) == 1:
+            query = query.where(Post.source_id == source_ids[0])
+            count_query = count_query.where(Post.source_id == source_ids[0])
+        else:
+            query = query.where(Post.source_id.in_(source_ids))
+            count_query = count_query.where(Post.source_id.in_(source_ids))
+    if set_ids:
+        # Use a correlated EXISTS subquery so the row set doesn't fan out across
+        # multiple SetMembership matches (a post in 3 of the requested sets would
+        # otherwise appear 3 times).
+        membership_subq = (
+            select(SetMembership.id)
+            .where(SetMembership.post_id == Post.id)
+            .where(SetMembership.set_id.in_(set_ids))
+        )
+        query = query.where(membership_subq.exists())
+        count_query = count_query.where(membership_subq.exists())
+    if untagged:
+        no_membership_subq = (
+            select(SetMembership.id)
+            .where(SetMembership.post_id == Post.id)
+        )
+        query = query.where(~no_membership_subq.exists())
+        count_query = count_query.where(~no_membership_subq.exists())
     if q:
         ts_query = or_(
             text("to_tsvector('spanish', coalesce(posts.text_content, '')) @@ plainto_tsquery('spanish', :q)"),
@@ -117,6 +184,7 @@ def _serialize_post(post: Post) -> dict:
         "platform_post_id": post.platform_post_id,
         "post_url": post.post_url,
         "text_content": post.text_content,
+        "content_language": post.content_language,
         "post_timestamp": post.post_timestamp.isoformat() if post.post_timestamp else None,
         "engagement": post.engagement,
         "platform_data": post.platform_data,
