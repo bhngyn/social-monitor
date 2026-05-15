@@ -21,16 +21,16 @@ import {
 } from "lucide-react";
 import { getPost, getSets, apiFetch } from "@/lib/api";
 import type { Post, TopicSet } from "@/lib/types";
-import { formatRelativeTime, platformIcon, platformColor } from "@/lib/utils";
+import { formatDateTime, formatRelativeTime, platformIcon, platformColor } from "@/lib/utils";
 import { MediaViewer } from "@/components/posts/MediaViewer";
 import { useI18n } from "@/lib/i18n";
 
 export default function PostDetailPage() {
   const params = useParams();
   const postId = params.id as string;
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
 
-  const { data: post, mutate } = useSWR<Post>(`post-${postId}`, () =>
+  const { data: post, error, mutate } = useSWR<Post>(`post-${postId}`, () =>
     getPost(postId)
   );
   const { data: sets } = useSWR<TopicSet[]>("sets", getSets);
@@ -39,6 +39,21 @@ export default function PostDetailPage() {
   const [noteText, setNoteText] = useState("");
   const [savingNote, setSavingNote] = useState(false);
   const [addToSetOpen, setAddToSetOpen] = useState(false);
+
+  if (error) {
+    return (
+      <div className="mx-auto max-w-2xl py-20 text-center">
+        <h2 className="text-lg font-medium text-foreground">{t("loading")}</h2>
+        <p className="mt-2 text-sm text-muted-foreground">{(error as Error).message}</p>
+        <Link
+          href="/posts"
+          className="mt-6 inline-flex items-center gap-1 rounded-md border border-border bg-card px-3 py-1.5 text-sm hover:bg-muted"
+        >
+          <ArrowLeft size={14} /> {t("navPosts")}
+        </Link>
+      </div>
+    );
+  }
 
   if (!post) {
     return (
@@ -154,15 +169,13 @@ export default function PostDetailPage() {
               <div>
                 <dt className="text-xs text-slate-400 uppercase">{t("posted")}</dt>
                 <dd className="text-slate-700">
-                  {post.post_timestamp
-                    ? new Date(post.post_timestamp).toLocaleString()
-                    : "—"}
+                  {formatDateTime(post.post_timestamp, locale)}
                 </dd>
               </div>
               <div>
                 <dt className="text-xs text-slate-400 uppercase">{t("archived")}</dt>
                 <dd className="text-slate-700">
-                  {new Date(post.created_at).toLocaleString()}
+                  {formatDateTime(post.created_at, locale)}
                 </dd>
               </div>
               <div>

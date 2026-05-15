@@ -24,14 +24,18 @@ function applyTheme(resolved: "light" | "dark") {
   else root.classList.remove("dark");
 }
 
-export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setThemeState] = useState<Theme>("system");
-  const [resolved, setResolved] = useState<"light" | "dark">("light");
+function readStoredTheme(): Theme {
+  if (typeof window === "undefined") return "system";
+  return (localStorage.getItem(STORAGE_KEY) as Theme | null) || "system";
+}
 
-  useEffect(() => {
-    const saved = (localStorage.getItem(STORAGE_KEY) as Theme | null) || "system";
-    setThemeState(saved);
-  }, []);
+export function ThemeProvider({ children }: { children: ReactNode }) {
+  // Lazy-init from localStorage so the first render matches what the pre-mount
+  // script in app/layout.tsx already applied to documentElement.
+  const [theme, setThemeState] = useState<Theme>(readStoredTheme);
+  const [resolved, setResolved] = useState<"light" | "dark">(() =>
+    readStoredTheme() === "system" ? getSystemTheme() : (readStoredTheme() as "light" | "dark")
+  );
 
   useEffect(() => {
     const r = theme === "system" ? getSystemTheme() : theme;

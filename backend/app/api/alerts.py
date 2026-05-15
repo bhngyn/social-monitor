@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func, select
@@ -66,7 +66,7 @@ async def update_alert(alert_id: uuid.UUID, data: dict, db: AsyncSession = Depen
         if key in data:
             setattr(alert, key, data[key])
 
-    alert.updated_at = datetime.utcnow()
+    alert.updated_at = datetime.now(timezone.utc)
     await db.commit()
     await db.refresh(alert)
     return alert

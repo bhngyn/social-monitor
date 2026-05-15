@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
@@ -45,7 +45,7 @@ async def update_note(note_id: uuid.UUID, data: dict, db: AsyncSession = Depends
 
     if "text" in data:
         note.text = data["text"]
-    note.updated_at = datetime.utcnow()
+    note.updated_at = datetime.now(timezone.utc)
     await db.commit()
     await db.refresh(note)
     return note

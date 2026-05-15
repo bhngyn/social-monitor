@@ -1,4 +1,3 @@
-import os
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Request
@@ -24,13 +23,17 @@ MIME_TYPES = {
 
 @router.get("/{file_path:path}")
 async def serve_file(file_path: str, request: Request):
-    # Prevent path traversal
-    clean_path = os.path.normpath(file_path)
-    if clean_path.startswith("..") or clean_path.startswith("/"):
+    # Prevent path traversal. resolve() also dereferences symlinks, so a
+    # symlink inside archive_root pointing outside of it will fail the
+    # containment check.
+    archive_root = Path(settings.archive_root).resolve()
+    try:
+        full_path = (archive_root / file_path).resolve()
+        full_path.relative_to(archive_root)
+    except (ValueError, OSError):
         raise HTTPException(status_code=400, detail="Invalid file path")
 
-    full_path = Path(settings.archive_root) / clean_path
-    if not full_path.exists() or not full_path.is_file():
+    if not full_path.is_file():
         raise HTTPException(status_code=404, detail="File not found")
 
     suffix = full_path.suffix.lower()

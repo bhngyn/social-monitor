@@ -1,3 +1,4 @@
+import logging
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -8,6 +9,7 @@ from app.database import get_db
 from app.models.ingestion_run import IngestionRun
 from app.models.source import Source
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
@@ -43,7 +45,10 @@ async def trigger_ingestion(
 
     await db.commit()
 
-    # Dispatch Celery tasks
+    # Dispatch Celery tasks. We catch and report errors per-run rather than
+    # silently swallowing them — a broker outage previously returned 202 with
+    # no indication that nothing was dispatched.
+    dispatch_errors: list[dict] = []
     for run in runs:
         await db.refresh(run)
         try:
@@ -52,14 +57,17 @@ async def trigger_ingestion(
                 "app.worker.tasks.ingest.ingest_source",
                 args=[str(run.source_id), str(run.id)],
             )
-        except Exception:
-            # Celery may not be available in all environments
-            pass
+        except Exception as exc:
+            logger.exception("Failed to dispatch ingest task for run %s", run.id)
+            dispatch_errors.append({"run_id": str(run.id), "error": str(exc)})
 
-    return {
-        "message": f"Ingestion triggered for {len(runs)} source(s)",
+    response: dict = {
+        "message": f"Ingestion triggered for {len(runs) - len(dispatch_errors)} source(s)",
         "run_ids": [str(r.id) for r in runs],
     }
+    if dispatch_errors:
+        response["dispatch_errors"] = dispatch_errors
+    return response
 
 
 @router.get("/runs")

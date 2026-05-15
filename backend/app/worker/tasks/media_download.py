@@ -3,6 +3,7 @@
 import hashlib
 import os
 import shutil
+import signal
 import subprocess
 import tempfile
 import uuid
@@ -11,6 +12,8 @@ from pathlib import Path
 import httpx
 
 from app.worker.celery_app import celery_app
+
+ALLOWED_RESOLUTIONS = {"240", "360", "480", "720", "1080", "1440", "2160", "best"}
 
 
 @celery_app.task(
@@ -50,6 +53,8 @@ def download_post_media(self, post_id: str):
         max_video_duration = int(os.environ.get("MAX_VIDEO_DURATION", "0"))
         max_video_filesize = os.environ.get("MAX_VIDEO_FILESIZE", "524288000")
         max_video_resolution = os.environ.get("MAX_VIDEO_RESOLUTION", "best")
+        if max_video_resolution not in ALLOWED_RESOLUTIONS:
+            max_video_resolution = "best"
 
         # Extract media URLs from raw metadata
         media_urls = _extract_media_urls(post.platform, post.raw_metadata, post.platform_data)
@@ -64,6 +69,7 @@ def download_post_media(self, post_id: str):
                         url, post_dir, post.platform_post_id, idx,
                         max_filesize=max_video_filesize,
                         max_resolution=max_video_resolution,
+                        max_duration=max_video_duration,
                     )
                 elif media_type in ("image", "gif") and download_images:
                     file_path = _download_image(url, post_dir, idx)
@@ -140,20 +146,22 @@ def _download_video(
     index: int,
     max_filesize: str = "524288000",
     max_resolution: str = "best",
+    max_duration: int = 0,
 ) -> Path | None:
     """Download a video using yt-dlp."""
-    # Use temp directory for download, then move to archive
+    if max_resolution not in ALLOWED_RESOLUTIONS:
+        max_resolution = "best"
+
     with tempfile.TemporaryDirectory(prefix="sm_video_") as tmp_dir:
         output_template = os.path.join(tmp_dir, f"video_{index:03d}.%(ext)s")
 
-        # Build format string
         if max_resolution != "best":
             format_str = f"bestvideo[height<={max_resolution}]+bestaudio/best[height<={max_resolution}]/best"
         else:
             format_str = "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best"
 
         cmd = [
-            "nice", "-n", "10",  # Lower CPU priority in container
+            "nice", "-n", "10",
             "yt-dlp",
             "--no-playlist",
             "--no-overwrites",
@@ -163,15 +171,33 @@ def _download_video(
             "--max-filesize", str(max_filesize),
             "--concurrent-fragments", "2",
             "--retries", "3",
-            url,
+            "--socket-timeout", "30",
         ]
+        if max_duration > 0:
+            cmd += ["--match-filter", f"duration <= {max_duration}"]
+        cmd.append(url)
 
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
+        # Use a process group so we can kill any orphaned ffmpeg children on timeout.
+        proc = subprocess.Popen(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            start_new_session=True,
+        )
+        try:
+            _, stderr = proc.communicate(timeout=600)
+        except subprocess.TimeoutExpired:
+            try:
+                os.killpg(proc.pid, signal.SIGKILL)
+            except (ProcessLookupError, PermissionError):
+                pass
+            proc.wait()
+            raise RuntimeError("yt-dlp timed out after 600s")
 
-        if result.returncode != 0:
-            raise RuntimeError(f"yt-dlp failed: {result.stderr[:500]}")
+        if proc.returncode != 0:
+            raise RuntimeError(f"yt-dlp failed: {(stderr or '')[:500]}")
 
-        # Find the downloaded file
         downloaded_files = list(Path(tmp_dir).glob("video_*"))
         if not downloaded_files:
             return None

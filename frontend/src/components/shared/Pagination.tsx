@@ -19,18 +19,18 @@ export function Pagination({ page, perPage, total, onPageChange }: PaginationPro
   if (total === 0) return null;
 
   return (
-    <div className="flex items-center justify-between border-t border-slate-200 pt-4">
-      <p className="text-sm text-slate-500">
-        {t("showing")} <span className="font-medium text-slate-700">{start}</span>
+    <div className="flex items-center justify-between border-t border-border pt-4">
+      <p className="text-sm text-muted-foreground">
+        {t("showing")} <span className="font-medium text-foreground">{start}</span>
         {" - "}
-        <span className="font-medium text-slate-700">{end}</span> {t("of")}{" "}
-        <span className="font-medium text-slate-700">{total}</span>
+        <span className="font-medium text-foreground">{end}</span> {t("of")}{" "}
+        <span className="font-medium text-foreground">{total}</span>
       </p>
       <div className="flex items-center gap-2">
         <button
           onClick={() => onPageChange(page - 1)}
           disabled={page <= 1}
-          className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+          className="inline-flex items-center gap-1 rounded-md border border-border bg-card px-3 py-1.5 text-sm font-medium text-foreground hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
         >
           <ChevronLeft size={16} />
           {t("previous")}
@@ -38,7 +38,7 @@ export function Pagination({ page, perPage, total, onPageChange }: PaginationPro
         <button
           onClick={() => onPageChange(page + 1)}
           disabled={page >= totalPages}
-          className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+          className="inline-flex items-center gap-1 rounded-md border border-border bg-card px-3 py-1.5 text-sm font-medium text-foreground hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
         >
           {t("next")}
           <ChevronRight size={16} />

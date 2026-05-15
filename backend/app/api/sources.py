@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func, select
@@ -101,7 +101,7 @@ async def update_source(
         if key in allowed_fields:
             setattr(source, key, value)
 
-    source.updated_at = datetime.utcnow()
+    source.updated_at = datetime.now(timezone.utc)
     await db.commit()
     await db.refresh(source)
     return source

@@ -75,6 +75,7 @@ async def list_posts(
     query = select(Post).options(
         selectinload(Post.media_files),
         selectinload(Post.set_memberships),
+        selectinload(Post.source),
     )
     count_query = select(func.count(func.distinct(Post.id)))
 
@@ -132,13 +133,18 @@ async def list_posts(
         query = query.where(Post.id.in_(media_sub))
         count_query = count_query.where(Post.id.in_(media_sub))
 
-    # Sorting
+    # Sorting — every branch includes Post.id as a deterministic tiebreaker so
+    # rows can't repeat or vanish across page boundaries when the primary key
+    # value is NULL (post_timestamp) or shared (engagement->>'likes').
     if sort == "oldest":
-        query = query.order_by(Post.post_timestamp.asc())
+        query = query.order_by(Post.post_timestamp.asc(), Post.id.asc())
     elif sort == "engagement":
-        query = query.order_by(text("(engagement->>'likes')::int DESC NULLS LAST"))
+        query = query.order_by(
+            text("(engagement->>'likes')::int DESC NULLS LAST"),
+            Post.id.desc(),
+        )
     else:
-        query = query.order_by(Post.post_timestamp.desc().nullslast())
+        query = query.order_by(Post.post_timestamp.desc().nullslast(), Post.id.desc())
 
     # Pagination
     total_result = await db.execute(count_query)

@@ -4,18 +4,20 @@ Reference document for building per-platform normalizers in `backend/app/service
 
 ---
 
-## Twitter/X — `apidojo/tweet-scraper`
+## Twitter/X — `kaitoeasyapi/twitter-x-data-tweet-scraper-pay-per-result-cheapest`
+
+**Input shape:** `{ "from": "<handle>", "maxItems": 20, "queryType": "Latest" }` — `from` is the Twitter handle without `@`.
+
+**Pagination caveat:** the actor returns ~20 tweets per call and pagination is unreliable; do not request `maxItems > 20`. Use per-source `poll_interval` to keep up with high-volume accounts.
 
 ```json
 {
   "id": "1806763776881860918",
   "url": "https://x.com/elonmusk/status/1806763776881860918",
   "text": "Which #memecoin can do #1000x this year?",
-  "full_text": "Which #memecoin can do #1000x this year?",
-  "createdAt": "2024-06-28T18:57:07.000Z",
+  "createdAt": "Fri Jun 28 18:57:07 +0000 2024",
   "lang": "en",
   "source": "Twitter Web App",
-  "possibly_sensitive": false,
 
   "likeCount": 104121,
   "retweetCount": 11311,
@@ -25,9 +27,10 @@ Reference document for building per-platform normalizers in `backend/app/service
   "viewCount": 2500000,
 
   "conversationId": "1806763776881860918",
-  "in_reply_to_status_id": null,
-  "in_reply_to_screen_name": null,
-  "is_quote_status": false,
+  "isReply": false,
+  "inReplyToId": null,
+  "isQuote": false,
+  "isRetweet": false,
 
   "author": {
     "id": "44196397",
@@ -81,7 +84,7 @@ Reference document for building per-platform normalizers in `backend/app/service
 | `id` | `platform_post_id` | |
 | `url` | `post_url` | |
 | `text` or `full_text` | `text_content` | |
-| `createdAt` | `post_timestamp` | ISO 8601 |
+| `createdAt` | `post_timestamp` | Twitter legacy format (`Wed May 06 11:09:39 +0000 2026`); normalizer also parses ISO 8601 |
 | `author.userName` | `source_username` | Match to source |
 | `likeCount` | `engagement.likes` | |
 | `retweetCount` | `engagement.retweets` | |
@@ -89,8 +92,13 @@ Reference document for building per-platform normalizers in `backend/app/service
 | `quoteCount` | `engagement.quotes` | |
 | `bookmarkCount` | `engagement.bookmarks` | |
 | `viewCount` | `engagement.views` | |
-| `conversationId`, `in_reply_to_*`, `is_quote_status`, `lang`, `source`, `possibly_sensitive` | `platform_data` | JSONB |
-| `entities` (hashtags, urls, mentions) | `platform_data.entities` | JSONB |
+| `conversationId` | `platform_data.conversation_id` | |
+| `inReplyToId` | `platform_data.reply_to_id` | New actor; legacy fallback: `in_reply_to_status_id` |
+| `isReply` | `platform_data.is_reply` | New actor; legacy derived from `in_reply_to_status_id != null` |
+| `isQuote` | `platform_data.is_quote` | New actor; legacy fallback: `is_quote_status` |
+| `isRetweet` | `platform_data.is_retweet` | |
+| `lang`, `source` | `platform_data.{language, source_app}` | |
+| `entities` (hashtags, urls, mentions) | `platform_data.{hashtags, mentions, urls}` | JSONB |
 | `entities.media[]` | → `media_files` rows | Download each |
 | Full response | `raw_metadata` | JSONB |
 

@@ -6,6 +6,7 @@ import json
 import os
 import uuid
 import zipfile
+from datetime import datetime, timezone
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -80,7 +81,7 @@ def _export_json(topic_set: TopicSet, posts: list[Post]) -> StreamingResponse:
     export_data = {
         "set_name": topic_set.name,
         "set_description": topic_set.description,
-        "exported_at": __import__("datetime").datetime.utcnow().isoformat(),
+        "exported_at": datetime.now(timezone.utc).isoformat(),
         "post_count": len(posts),
         "posts": [
             {
@@ -208,7 +209,7 @@ async def _export_zip(topic_set: TopicSet, posts: list[Post], db: AsyncSession) 
         # Manifest
         manifest = {
             "set_name": topic_set.name,
-            "export_date": __import__("datetime").datetime.utcnow().isoformat(),
+            "export_date": datetime.now(timezone.utc).isoformat(),
             "post_count": len(posts),
         }
         zf.writestr("manifest.json", json.dumps(manifest, indent=2))

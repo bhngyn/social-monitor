@@ -136,7 +136,9 @@ def capture_post(self, post_id: str):
             post.updated_at = datetime.now(timezone.utc)
             session.commit()
 
-            # Trigger hash computation
+            # Both capture and media_download dispatch hashing because they
+            # run on different queues with unknown ordering — hashing is
+            # idempotent (ON CONFLICT DO NOTHING on FileHash.file_path).
             from app.worker.tasks.hashing import compute_hashes
             compute_hashes.delay(post_id)
 
