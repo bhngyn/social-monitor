@@ -1,6 +1,7 @@
 import type { Config } from 'tailwindcss';
 
 const config: Config = {
+  darkMode: 'class',
   content: [
     './src/**/*.{js,ts,jsx,tsx,mdx}',
   ],
@@ -15,6 +16,15 @@ const config: Config = {
           foreground: 'hsl(var(--muted-foreground))',
         },
         ring: 'hsl(var(--ring))',
+        card: {
+          DEFAULT: 'hsl(var(--card))',
+          foreground: 'hsl(var(--card-foreground))',
+        },
+        accent: {
+          DEFAULT: 'hsl(var(--accent))',
+          foreground: 'hsl(var(--accent-foreground))',
+        },
+        input: 'hsl(var(--input))',
         sidebar: {
           DEFAULT: '#0f172a',
           foreground: '#e2e8f0',
