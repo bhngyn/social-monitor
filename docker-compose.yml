@@ -1,0 +1,218 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-social_monitor}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change_me_in_production}
+      POSTGRES_DB: ${POSTGRES_DB:-social_monitor}
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-social_monitor}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: "${DB_CPU_LIMIT:-1.0}"
+          memory: ${DB_MEMORY_LIMIT:-1G}
+    command: >
+      postgres
+        -c shared_buffers=256MB
+        -c work_mem=16MB
+        -c effective_cache_size=512MB
+        -c maintenance_work_mem=128MB
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 256M
+
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    command: >
+      uvicorn app.main:app
+        --host 0.0.0.0
+        --port 8000
+        --reload
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=${DATABASE_URL:-postgresql+asyncpg://social_monitor:change_me_in_production@db:5432/social_monitor}
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
+      - APIFY_API_TOKEN=${APIFY_API_TOKEN:-}
+      - ARCHIVE_ROOT=/data/archive
+      - MAX_CONCURRENT_INGESTIONS=${MAX_CONCURRENT_INGESTIONS:-3}
+      - DEFAULT_POLL_INTERVAL=${DEFAULT_POLL_INTERVAL:-3600}
+      - MAX_VIDEO_FILESIZE=${MAX_VIDEO_FILESIZE:-524288000}
+      - MAX_VIDEO_DURATION=${MAX_VIDEO_DURATION:-0}
+      - MAX_VIDEO_RESOLUTION=${MAX_VIDEO_RESOLUTION:-best}
+    volumes:
+      - ${ARCHIVE_HOST_PATH:-./archive_data}:/data/archive
+      - ./backend:/app
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: "${API_CPU_LIMIT:-1.0}"
+          memory: ${API_MEMORY_LIMIT:-1G}
+
+  worker-default:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    command: >
+      celery -A app.worker.celery_app worker
+        -Q default
+        --loglevel=info
+        --concurrency=${WORKER_DEFAULT_CONCURRENCY:-4}
+        --max-tasks-per-child=50
+        -n default@%h
+    environment:
+      - DATABASE_URL=${DATABASE_URL:-postgresql+asyncpg://social_monitor:change_me_in_production@db:5432/social_monitor}
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
+      - APIFY_API_TOKEN=${APIFY_API_TOKEN:-}
+      - ARCHIVE_ROOT=/data/archive
+    volumes:
+      - ${ARCHIVE_HOST_PATH:-./archive_data}:/data/archive
+      - ./backend:/app
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: "${WORKER_DEFAULT_CPU_LIMIT:-1.0}"
+          memory: ${WORKER_DEFAULT_MEMORY_LIMIT:-1G}
+
+  worker-media:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    command: >
+      celery -A app.worker.celery_app worker
+        -Q media
+        --loglevel=info
+        --concurrency=${WORKER_MEDIA_CONCURRENCY:-2}
+        --max-tasks-per-child=50
+        -n media@%h
+    environment:
+      - DATABASE_URL=${DATABASE_URL:-postgresql+asyncpg://social_monitor:change_me_in_production@db:5432/social_monitor}
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
+      - ARCHIVE_ROOT=/data/archive
+      - MAX_VIDEO_FILESIZE=${MAX_VIDEO_FILESIZE:-524288000}
+      - MAX_VIDEO_DURATION=${MAX_VIDEO_DURATION:-0}
+      - MAX_VIDEO_RESOLUTION=${MAX_VIDEO_RESOLUTION:-best}
+    volumes:
+      - ${ARCHIVE_HOST_PATH:-./archive_data}:/data/archive
+      - ./backend:/app
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: "${WORKER_MEDIA_CPU_LIMIT:-1.5}"
+          memory: ${WORKER_MEDIA_MEMORY_LIMIT:-2G}
+
+  worker-capture:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    command: >
+      celery -A app.worker.celery_app worker
+        -Q capture
+        --loglevel=info
+        --concurrency=1
+        --max-tasks-per-child=20
+        -n capture@%h
+    environment:
+      - DATABASE_URL=${DATABASE_URL:-postgresql+asyncpg://social_monitor:change_me_in_production@db:5432/social_monitor}
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
+      - ARCHIVE_ROOT=/data/archive
+    volumes:
+      - ${ARCHIVE_HOST_PATH:-./archive_data}:/data/archive
+      - ./backend:/app
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: "${WORKER_CAPTURE_CPU_LIMIT:-1.0}"
+          memory: ${WORKER_CAPTURE_MEMORY_LIMIT:-2G}
+        reservations:
+          cpus: "0.25"
+          memory: 512M
+
+  beat:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    command: >
+      celery -A app.worker.celery_app beat
+        --loglevel=info
+        --scheduler app.worker.scheduler:DatabaseScheduler
+    environment:
+      - DATABASE_URL=${DATABASE_URL:-postgresql+asyncpg://social_monitor:change_me_in_production@db:5432/social_monitor}
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
+    volumes:
+      - ./backend:/app
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 256M
+
+  web:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+      - API_INTERNAL_URL=http://api:8000
+    volumes:
+      - ./frontend/src:/app/src
+      - ./frontend/public:/app/public
+    depends_on:
+      - api
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512M
+
+volumes:
+  pg_data:
