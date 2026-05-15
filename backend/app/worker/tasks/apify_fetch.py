@@ -8,7 +8,7 @@ from app.worker.celery_app import celery_app
 
 # Apify actor mapping per platform
 ACTOR_MAP = {
-    "twitter": "apidojo/tweet-scraper",
+    "twitter": "kaitoeasyapi/twitter-x-data-tweet-scraper-pay-per-result-cheapest",
     "instagram": "apify/instagram-scraper",
     "facebook": "apify/facebook-posts-scraper",
     "tiktok": "clockworks/tiktok-scraper",
@@ -62,10 +62,11 @@ def _build_actor_input(source) -> dict:
     config = source.config or {}
 
     if source.platform == "twitter":
+        handle = (source.username or "").strip().lstrip("@").strip()
         return {
-            "startUrls": [{"url": source.profile_url or f"https://twitter.com/{source.username}"}],
-            "maxItems": config.get("max_items", 50),
-            "sort": "Latest",
+            "from": handle,
+            "maxItems": config.get("max_items", 20),
+            "queryType": "Latest",
         }
     elif source.platform == "instagram":
         return {
@@ -93,52 +94,58 @@ def _build_actor_input(source) -> dict:
 
 
 def upsert_posts(session, source, posts_data: list[dict]) -> list[uuid.UUID]:
-    """Insert new posts, update existing ones. Returns list of new post IDs."""
+    """Insert new posts, update existing ones. Returns list of new post IDs.
+
+    Uses INSERT ... ON CONFLICT to be safe against concurrent runs on the same
+    source (which would otherwise race on the (platform, platform_post_id)
+    unique index).
+    """
+    from sqlalchemy import literal_column
     from sqlalchemy.dialects.postgresql import insert
     from app.models.post import Post
     from app.models.audit import AuditLog
 
-    new_post_ids = []
+    new_post_ids: list[uuid.UUID] = []
+    now = datetime.now(timezone.utc)
 
     for data in posts_data:
-        # Check if post exists
-        existing = session.query(Post).filter_by(
-            platform=data["platform"],
-            platform_post_id=data["platform_post_id"],
-        ).first()
-
-        if existing:
-            # Update engagement metrics
-            existing.engagement = data.get("engagement", {})
-            existing.updated_at = datetime.now(timezone.utc)
-        else:
-            post = Post(
+        engagement = data.get("engagement", {})
+        stmt = (
+            insert(Post)
+            .values(
                 source_id=source.id,
                 platform=data["platform"],
                 platform_post_id=data["platform_post_id"],
                 post_url=data["post_url"],
                 text_content=data.get("text_content"),
                 post_timestamp=data.get("post_timestamp"),
-                engagement=data.get("engagement", {}),
+                engagement=engagement,
                 platform_data=data.get("platform_data", {}),
                 raw_metadata=data.get("raw_metadata", {}),
             )
-            session.add(post)
-            session.flush()
-            new_post_ids.append(post.id)
-
-            # Audit log
-            audit = AuditLog(
+            .on_conflict_do_update(
+                index_elements=["platform", "platform_post_id"],
+                set_={"engagement": engagement, "updated_at": now},
+            )
+            # xmax = 0 in PostgreSQL ↔ row was just inserted (not updated)
+            .returning(Post.id, literal_column("(xmax = 0)").label("inserted"))
+        )
+        row = session.execute(stmt).first()
+        if row is None:
+            continue
+        post_id, inserted = row
+        if inserted:
+            new_post_ids.append(post_id)
+            session.add(AuditLog(
                 event_type="post_first_seen",
                 entity_type="post",
-                entity_id=str(post.id),
+                entity_id=str(post_id),
                 details={
                     "platform": data["platform"],
                     "platform_post_id": data["platform_post_id"],
                     "source_id": str(source.id),
                 },
-            )
-            session.add(audit)
+            ))
 
     session.commit()
     return new_post_ids

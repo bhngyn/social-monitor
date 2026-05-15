@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { memo, useState } from "react";
 import Link from "next/link";
 import {
   Heart,
@@ -27,7 +27,7 @@ interface PostCardProps {
   onMutate?: () => void;
 }
 
-export function PostCard({
+function PostCardImpl({
   post,
   selected,
   focused = false,
@@ -249,3 +249,8 @@ export function PostCard({
     </div>
   );
 }
+
+// Memoize so changing one card's focus/selection doesn't rerender every other
+// card on the page. Parents should pass stable handler references
+// (useCallback) and a stable availableSets array.
+export const PostCard = memo(PostCardImpl);

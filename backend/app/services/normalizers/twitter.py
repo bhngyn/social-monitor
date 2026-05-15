@@ -2,9 +2,11 @@ from datetime import datetime, timezone
 
 
 def normalize_twitter(item: dict, source) -> dict | None:
-    """Normalize Apify Twitter/X scraper output (apidojo/tweet-scraper).
+    """Normalize Apify Twitter/X scraper output.
 
-    Handles both camelCase (Apify) and snake_case (legacy) field names.
+    Supports kaitoeasyapi/twitter-x-data-tweet-scraper-pay-per-result-cheapest
+    (current) and apidojo/tweet-scraper (legacy). Handles both camelCase and
+    snake_case field names.
     """
     post_id = item.get("id") or item.get("id_str") or item.get("tweetId")
     if not post_id:
@@ -63,10 +65,10 @@ def normalize_twitter(item: dict, source) -> dict | None:
         or (item.get("engagement") or {}).get("bookmarkCount")
         or 0
     )
+    raw_views = item.get("views")
     views = (
         item.get("viewCount")
-        or (item.get("views") if not isinstance(item.get("views"), dict) else None)
-        or (item.get("views") or {}).get("count") if isinstance(item.get("views"), dict) else None
+        or (raw_views.get("count") if isinstance(raw_views, dict) else raw_views)
         or (item.get("engagement") or {}).get("viewCount")
         or 0
     )
@@ -86,14 +88,18 @@ def normalize_twitter(item: dict, source) -> dict | None:
 
     # Conversation / threading
     conversation_id = item.get("conversationId") or item.get("conversation_id")
-    in_reply_to = item.get("in_reply_to_status_id") or item.get("in_reply_to_status_id_str")
+    in_reply_to = (
+        item.get("inReplyToId")
+        or item.get("in_reply_to_status_id")
+        or item.get("in_reply_to_status_id_str")
+    )
     in_reply_to_user = item.get("in_reply_to_screen_name")
-    is_quote = item.get("is_quote_status", False)
+    is_quote = item.get("is_quote_status") or item.get("isQuote", False)
     is_retweet = (
         item.get("retweeted_status") is not None
         or item.get("isRetweet", False)
     )
-    is_reply = in_reply_to is not None
+    is_reply = item.get("isReply", in_reply_to is not None)
 
     return {
         "platform": "twitter",

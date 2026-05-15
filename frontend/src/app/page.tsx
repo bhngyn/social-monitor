@@ -19,6 +19,7 @@ import type { Source, Post, PostListResponse, StorageStats } from "@/lib/types";
 import {
   formatRelativeTime,
   formatBytes,
+  isSameDay,
   platformIcon,
   platformColor,
 } from "@/lib/utils";
@@ -31,7 +32,7 @@ import {
 import { EmptyState } from "@/components/shared/EmptyState";
 
 export default function DashboardPage() {
-  const { t, tf } = useI18n();
+  const { t, tf, locale } = useI18n();
   const [showRecent, setShowRecent] = useState(true);
 
   const { data: sources } = useSWR<Source[]>("sources", getSources);
@@ -72,15 +73,9 @@ export default function DashboardPage() {
   const storageUsed = storage?.archive_bytes ?? 0;
 
   const postsToday = useMemo(() => {
-    const today = new Date().toDateString();
-    return posts.filter((p) => {
-      const ref = p.post_timestamp || p.created_at;
-      if (!ref) return false;
-      const d = new Date(ref);
-      if (isNaN(d.getTime())) return false;
-      return d.toDateString() === today;
-    }).length;
-  }, [posts]);
+    const today = new Date();
+    return posts.filter((p) => isSameDay(p.post_timestamp || p.created_at, today, locale)).length;
+  }, [posts, locale]);
 
   const recentPosts = posts.slice(0, 10);
 

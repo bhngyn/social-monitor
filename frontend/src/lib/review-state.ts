@@ -6,17 +6,28 @@ const STORAGE_KEY = "sm-source-reviewed";
 type ReviewedMap = Record<string, string>; // sourceId -> ISO timestamp
 
 const listeners = new Set<() => void>();
+const EMPTY: ReviewedMap = {};
+
+let cachedRaw: string | null = null;
+let cachedMap: ReviewedMap = EMPTY;
 
 function emit() { listeners.forEach((l) => l()); }
 
 function readMap(): ReviewedMap {
-  if (typeof window === "undefined") return {};
-  try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}"); }
-  catch { return {}; }
+  if (typeof window === "undefined") return EMPTY;
+  const raw = localStorage.getItem(STORAGE_KEY) ?? "";
+  if (raw === cachedRaw) return cachedMap;
+  cachedRaw = raw;
+  try { cachedMap = raw ? JSON.parse(raw) : EMPTY; }
+  catch { cachedMap = EMPTY; }
+  return cachedMap;
 }
 
 function writeMap(map: ReviewedMap) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(map));
+  const serialized = JSON.stringify(map);
+  localStorage.setItem(STORAGE_KEY, serialized);
+  cachedRaw = serialized;
+  cachedMap = map;
   emit();
 }
 
@@ -64,7 +75,6 @@ function subscribe(cb: () => void): () => void {
   };
 }
 
-const EMPTY: ReviewedMap = {};
 export function useReviewState(): ReviewedMap {
   return useSyncExternalStore(subscribe, readMap, () => EMPTY);
 }

@@ -1,8 +1,9 @@
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func, select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
@@ -76,7 +77,7 @@ async def update_set(
         if key in data:
             setattr(topic_set, key, data[key])
 
-    topic_set.updated_at = datetime.utcnow()
+    topic_set.updated_at = datetime.now(timezone.utc)
     await db.commit()
     await db.refresh(topic_set)
     return topic_set
@@ -102,22 +103,19 @@ async def add_posts_to_set(
         raise HTTPException(status_code=404, detail="Set not found")
 
     post_ids = data.get("post_ids", [])
+    note = data.get("note")
+
     added = 0
     for post_id in post_ids:
-        # Check if already in set
-        existing = await db.execute(
-            select(SetMembership).where(
-                SetMembership.set_id == set_id,
-                SetMembership.post_id == uuid.UUID(post_id) if isinstance(post_id, str) else post_id,
-            )
+        pid = uuid.UUID(post_id) if isinstance(post_id, str) else post_id
+        stmt = (
+            pg_insert(SetMembership)
+            .values(set_id=set_id, post_id=pid, note=note)
+            .on_conflict_do_nothing(index_elements=["set_id", "post_id"])
+            .returning(SetMembership.id)
         )
-        if not existing.scalars().first():
-            membership = SetMembership(
-                set_id=set_id,
-                post_id=uuid.UUID(post_id) if isinstance(post_id, str) else post_id,
-                note=data.get("note"),
-            )
-            db.add(membership)
+        result = await db.execute(stmt)
+        if result.scalar() is not None:
             added += 1
 
     await db.commit()

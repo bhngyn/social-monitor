@@ -16,6 +16,9 @@ export function useKeyboardShortcuts(map: ShortcutMap, enabled: boolean = true) 
   useEffect(() => {
     if (!enabled) return;
     const handler = (e: KeyboardEvent) => {
+      // Escape is reserved for closing dialogs/popovers/modals — never
+      // intercept it as a shortcut.
+      if (e.key === "Escape") return;
       if (isTypingTarget(e.target)) return;
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       let key = e.key.toLowerCase();

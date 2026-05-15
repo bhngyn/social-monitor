@@ -197,7 +197,7 @@ export function PostCardActions({
                   <button
                     type="submit"
                     disabled={!newName.trim() || savingNew}
-                    className="rounded bg-slate-900 px-2 py-1 text-xs font-medium text-white hover:bg-slate-800 disabled:opacity-50 dark:bg-slate-100 dark:text-slate-900"
+                    className="rounded bg-foreground px-2 py-1 text-xs font-medium text-background hover:opacity-90 disabled:opacity-50"
                   >
                     {t("save")}
                   </button>

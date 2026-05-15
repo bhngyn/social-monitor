@@ -1,7 +1,7 @@
 import os
 import shutil
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -112,7 +112,7 @@ async def update_retention_policy(
         if key in data:
             setattr(policy, key, data[key])
 
-    policy.updated_at = datetime.utcnow()
+    policy.updated_at = datetime.now(timezone.utc)
     await db.commit()
     await db.refresh(policy)
     return policy

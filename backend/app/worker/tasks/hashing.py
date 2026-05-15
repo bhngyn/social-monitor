@@ -23,6 +23,8 @@ def compute_hashes(self, post_id: str):
     db_url = os.environ.get("DATABASE_URL", "").replace("postgresql+asyncpg://", "postgresql://")
     engine = create_engine(db_url)
 
+    from sqlalchemy.dialects.postgresql import insert as pg_insert
+
     with Session(engine) as session:
         from app.models.post import Post
         from app.models.hash import FileHash
@@ -45,21 +47,27 @@ def compute_hashes(self, post_id: str):
 
             rel_path = str(file_path.relative_to(archive_root))
 
-            # Check if already hashed
-            existing = session.query(FileHash).filter_by(file_path=rel_path).first()
-            if existing:
+            if session.query(FileHash).filter_by(file_path=rel_path).first():
                 continue
 
             sha256, md5, file_size = _compute_file_hashes(file_path)
 
-            file_hash = FileHash(
-                file_path=rel_path,
-                sha256=sha256,
-                md5=md5,
-                file_size=file_size,
+            # ON CONFLICT DO NOTHING guards against the brief race where
+            # capture and media_download both dispatch hashing for the same
+            # post and walk the same files concurrently.
+            stmt = (
+                pg_insert(FileHash)
+                .values(
+                    file_path=rel_path,
+                    sha256=sha256,
+                    md5=md5,
+                    file_size=file_size,
+                )
+                .on_conflict_do_nothing(index_elements=["file_path"])
             )
-            session.add(file_hash)
-            hashed_count += 1
+            result = session.execute(stmt)
+            if result.rowcount:
+                hashed_count += 1
 
         post.hashes_computed = True
         post.updated_at = datetime.now(timezone.utc)

@@ -1,22 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
+import useSWR from "swr";
 import { Clock } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
-
-interface TimelinePost {
-  id: string;
-  platform: string;
-  post_url: string;
-  text_content: string | null;
-  post_timestamp: string | null;
-  engagement: Record<string, number>;
-  source_username: string | null;
-  source_avatar_url: string | null;
-  has_media: boolean;
-  media_count: number;
-}
+import { getTimeline, type TimelinePost } from "@/lib/api";
 
 const PLATFORM_COLORS: Record<string, string> = {
   twitter: "bg-blue-400",
@@ -27,35 +16,29 @@ const PLATFORM_COLORS: Record<string, string> = {
 };
 
 export default function TimelinePage() {
-  const [posts, setPosts] = useState<TimelinePost[]>([]);
-  const [loading, setLoading] = useState(true);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [platform, setPlatform] = useState("");
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
 
-  const fetchTimeline = async () => {
-    setLoading(true);
-    const params = new URLSearchParams();
-    if (dateFrom) params.set("date_from", dateFrom);
-    if (dateTo) params.set("date_to", dateTo);
-    if (platform) params.set("platform", platform);
-    params.set("limit", "200");
-
-    try {
-      const res = await fetch(`/api/timeline?${params}`);
-      if (res.ok) setPosts(await res.json());
-    } finally {
-      setLoading(false);
-    }
+  const params = {
+    date_from: dateFrom || undefined,
+    date_to: dateTo || undefined,
+    platform: platform || undefined,
+    limit: 200,
   };
 
-  useEffect(() => { fetchTimeline(); }, [dateFrom, dateTo, platform]);
+  const { data, error, isLoading } = useSWR<TimelinePost[]>(
+    ["timeline", dateFrom, dateTo, platform],
+    () => getTimeline(params),
+  );
+  const posts = data ?? [];
+  const loading = isLoading;
 
   // Group posts by date
   const grouped = posts.reduce<Record<string, TimelinePost[]>>((acc, post) => {
     const date = post.post_timestamp
-      ? new Date(post.post_timestamp).toLocaleDateString()
+      ? new Date(post.post_timestamp).toLocaleDateString(locale === "es" ? "es-ES" : "en-US")
       : t("unknownDate");
     if (!acc[date]) acc[date] = [];
     acc[date].push(post);
@@ -94,7 +77,11 @@ export default function TimelinePage() {
         </div>
       </div>
 
-      {loading ? (
+      {error ? (
+        <div className="text-center py-12 text-red-600">
+          {t("loadingTimeline")} — {(error as Error).message}
+        </div>
+      ) : loading ? (
         <div className="text-center py-12 text-gray-500">{t("loadingTimeline")}</div>
       ) : posts.length === 0 ? (
         <div className="text-center py-12">

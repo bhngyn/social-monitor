@@ -220,9 +220,22 @@ export function getAlertEvents(alertId?: string): Promise<AlertEvent[]> {
 
 // --- Timeline ---
 
+export interface TimelinePost {
+  id: string;
+  platform: string;
+  post_url: string;
+  text_content: string | null;
+  post_timestamp: string | null;
+  engagement: Record<string, number>;
+  source_username: string | null;
+  source_avatar_url: string | null;
+  has_media: boolean;
+  media_count: number;
+}
+
 export function getTimeline(
   params?: Record<string, string | number | undefined>
-): Promise<PostListResponse> {
+): Promise<TimelinePost[]> {
   const query = params
     ? '?' +
       new URLSearchParams(
@@ -231,7 +244,7 @@ export function getTimeline(
           .map(([k, v]) => [k, String(v)])
       ).toString()
     : '';
-  return apiFetch<PostListResponse>(`/timeline${query}`);
+  return apiFetch<TimelinePost[]>(`/timeline${query}`);
 }
 
 // --- Storage ---

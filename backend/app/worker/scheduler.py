@@ -13,7 +13,7 @@ class DatabaseScheduler(Scheduler):
     sync_every = 60  # Re-read DB every 60 seconds
 
     def __init__(self, *args, **kwargs):
-        self._last_sync = None
+        self._last_db_sync = None
         self._schedule = {}
         super().__init__(*args, **kwargs)
 
@@ -74,13 +74,13 @@ class DatabaseScheduler(Scheduler):
         )
 
         self._schedule = new_schedule
-        self._last_sync = datetime.now(timezone.utc)
+        self._last_db_sync = datetime.now(timezone.utc)
 
     @property
     def schedule(self):
         if (
-            self._last_sync is None
-            or (datetime.now(timezone.utc) - self._last_sync).total_seconds() > self.sync_every
+            self._last_db_sync is None
+            or (datetime.now(timezone.utc) - self._last_db_sync).total_seconds() > self.sync_every
         ):
             self._update_from_db()
         return self._schedule
