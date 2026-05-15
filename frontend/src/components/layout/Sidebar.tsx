@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
+import useSWR from "swr";
 import {
   LayoutDashboard,
   Users,
@@ -15,10 +16,12 @@ import {
   Settings,
   ChevronLeft,
   ChevronRight,
-  Globe,
 } from "lucide-react";
 import { clsx } from "clsx";
 import { useI18n, type TranslationKey } from "@/lib/i18n";
+import { useReviewState, isPostNew } from "@/lib/review-state";
+import { getPosts } from "@/lib/api";
+import type { PostListResponse } from "@/lib/types";
 
 const navItems: { href: string; labelKey: TranslationKey; icon: typeof LayoutDashboard }[] = [
   { href: "/", labelKey: "navDashboard", icon: LayoutDashboard },
@@ -35,15 +38,23 @@ const navItems: { href: string; labelKey: TranslationKey; icon: typeof LayoutDas
 export function Sidebar() {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
-  const { locale, setLocale, t } = useI18n();
+  const { t } = useI18n();
+  const reviewMap = useReviewState();
+
+  // Fetch a recent sample to compute "new" badge count for Posts nav item
+  const { data: recentPosts } = useSWR<PostListResponse>(
+    "sidebar-recent",
+    () => getPosts({ per_page: 200 }),
+    { revalidateOnFocus: false }
+  );
+
+  const newCount = recentPosts
+    ? recentPosts.items.filter((p) => isPostNew(p, reviewMap)).length
+    : 0;
 
   const isActive = (href: string) => {
     if (href === "/") return pathname === "/";
     return pathname.startsWith(href);
-  };
-
-  const toggleLocale = () => {
-    setLocale(locale === "en" ? "es" : "en");
   };
 
   return (
@@ -62,7 +73,7 @@ export function Sidebar() {
         )}
         <button
           onClick={() => setCollapsed(!collapsed)}
-          className="rounded p-1 text-slate-400 hover:bg-slate-800 hover:text-white"
+          className="rounded p-1 text-slate-300 hover:bg-slate-800 hover:text-white"
           aria-label={collapsed ? t("expandSidebar") : t("collapseSidebar")}
         >
           {collapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
@@ -75,42 +86,37 @@ export function Sidebar() {
           const Icon = item.icon;
           const active = isActive(item.href);
           const label = t(item.labelKey);
+          const isPostsItem = item.href === "/posts";
           return (
             <Link
               key={item.href}
               href={item.href}
               className={clsx(
-                "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                "relative flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
                 active
                   ? "bg-slate-800 text-white"
-                  : "text-slate-400 hover:bg-slate-800 hover:text-white",
+                  : "text-slate-300 hover:bg-slate-800 hover:text-white",
                 collapsed && "justify-center px-2"
               )}
               title={collapsed ? label : undefined}
             >
               <Icon size={20} className="shrink-0" />
-              {!collapsed && <span>{label}</span>}
+              {!collapsed && <span className="flex-1">{label}</span>}
+
+              {/* Badge: expanded → pill with count; collapsed → red dot */}
+              {isPostsItem && newCount > 0 && (
+                collapsed ? (
+                  <span className="absolute left-8 top-1 h-2 w-2 rounded-full bg-red-500" />
+                ) : (
+                  <span className="ml-auto rounded-full bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5">
+                    {newCount > 99 ? "99+" : newCount}
+                  </span>
+                )
+              )}
             </Link>
           );
         })}
       </nav>
-
-      {/* Language toggle */}
-      <div className="border-t border-slate-700 px-2 py-3">
-        <button
-          onClick={toggleLocale}
-          className={clsx(
-            "flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-slate-400 hover:bg-slate-800 hover:text-white transition-colors",
-            collapsed && "justify-center px-2"
-          )}
-          title={collapsed ? t("language") : undefined}
-        >
-          <Globe size={20} className="shrink-0" />
-          {!collapsed && (
-            <span>{locale === "en" ? "Español" : "English"}</span>
-          )}
-        </button>
-      </div>
     </aside>
   );
 }

@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="{{ locale }}">
+<head>
+  <meta charset="utf-8">
+  <title>{{ topic_set.name }} - {{ t.cover_title }}</title>
+  <style>
+    /* WeasyPrint page setup. Evidentiary look: monochrome, restrained. */
+    @page {
+      size: A4;
+      margin: 18mm 16mm 22mm 16mm;
+      @bottom-left {
+        content: "{{ t.generated_by }}";
+        font-family: "Liberation Sans", sans-serif;
+        font-size: 8pt;
+        color: #555;
+      }
+      @bottom-right {
+        content: "{{ t.page }} " counter(page) " / " counter(pages);
+        font-family: "Liberation Sans", sans-serif;
+        font-size: 8pt;
+        color: #555;
+      }
+    }
+
+    @page :first {
+      margin: 30mm 20mm;
+      @bottom-left { content: none; }
+      @bottom-right { content: none; }
+    }
+
+    html, body {
+      font-family: "Liberation Sans", Arial, sans-serif;
+      color: #111;
+      font-size: 10pt;
+      line-height: 1.4;
+      margin: 0;
+      padding: 0;
+    }
+
+    h1, h2, h3, h4 {
+      font-weight: 700;
+      margin: 0 0 0.4em 0;
+      color: #000;
+    }
+
+    a {
+      color: #111;
+      text-decoration: none;
+      word-break: break-all;
+    }
+
+    /* Cover */
+    .cover {
+      page-break-after: always;
+      padding-top: 40mm;
+      text-align: center;
+    }
+    .cover .case-title {
+      font-size: 28pt;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      border-top: 2px solid #000;
+      border-bottom: 2px solid #000;
+      padding: 14pt 0;
+      margin: 0 auto 28pt auto;
+      max-width: 80%;
+    }
+    .cover .set-name {
+      font-size: 22pt;
+      font-weight: 700;
+      margin-bottom: 18pt;
+    }
+    .cover .set-description {
+      font-size: 11pt;
+      color: #333;
+      max-width: 70%;
+      margin: 0 auto 36pt auto;
+      font-style: italic;
+    }
+    .cover .meta {
+      display: inline-block;
+      text-align: left;
+      border: 1px solid #000;
+      padding: 14pt 22pt;
+      font-size: 10pt;
+    }
+    .cover .meta div { margin-bottom: 6pt; }
+    .cover .meta .label {
+      display: inline-block;
+      width: 140pt;
+      color: #555;
+      text-transform: uppercase;
+      font-size: 8.5pt;
+      letter-spacing: 0.05em;
+    }
+
+    /* Index */
+    .index {
+      page-break-after: always;
+      page-break-before: always;
+    }
+    .index h2 {
+      font-size: 14pt;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      border-bottom: 1px solid #000;
+      padding-bottom: 6pt;
+      margin-bottom: 14pt;
+    }
+    table.index-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 9.5pt;
+    }
+    table.index-table th {
+      text-align: left;
+      border-bottom: 1px solid #000;
+      padding: 6pt 4pt;
+      text-transform: uppercase;
+      font-size: 8.5pt;
+      letter-spacing: 0.04em;
+      color: #555;
+    }
+    table.index-table td {
+      padding: 5pt 4pt;
+      border-bottom: 1px solid #ddd;
+      vertical-align: top;
+    }
+    table.index-table td.num {
+      font-family: "Liberation Mono", monospace;
+      width: 32pt;
+      color: #555;
+    }
+
+    /* Exhibits */
+    .exhibit {
+      page-break-before: always;
+    }
+    .exhibit h2.exhibit-title {
+      font-size: 13pt;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      border-bottom: 1px solid #000;
+      padding-bottom: 5pt;
+      margin-bottom: 14pt;
+    }
+
+    table.meta-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 14pt;
+      font-size: 9.5pt;
+    }
+    table.meta-table td {
+      padding: 4pt 6pt;
+      border-bottom: 1px solid #eee;
+      vertical-align: top;
+    }
+    table.meta-table td.label {
+      width: 30%;
+      color: #555;
+      text-transform: uppercase;
+      font-size: 8.5pt;
+      letter-spacing: 0.04em;
+      font-weight: 600;
+    }
+    table.meta-table td.value {
+      font-family: "Liberation Mono", monospace;
+      font-size: 9pt;
+      word-break: break-all;
+    }
+
+    .section-label {
+      text-transform: uppercase;
+      font-size: 8.5pt;
+      letter-spacing: 0.05em;
+      color: #555;
+      font-weight: 700;
+      margin: 14pt 0 6pt 0;
+      border-bottom: 1px solid #999;
+      padding-bottom: 3pt;
+    }
+
+    .text-content {
+      font-family: "Liberation Mono", monospace;
+      font-size: 9.5pt;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      background: #f8f8f8;
+      padding: 10pt;
+      border: 1px solid #ddd;
+    }
+
+    .screenshot-block {
+      page-break-inside: avoid;
+      text-align: center;
+      margin: 10pt 0;
+    }
+    .screenshot-block img {
+      max-width: 100%;
+      max-height: 600px;
+      border: 1px solid #999;
+    }
+    .screenshot-missing {
+      font-style: italic;
+      color: #777;
+      font-size: 9pt;
+      padding: 8pt;
+      border: 1px dashed #bbb;
+      text-align: center;
+    }
+
+    .notes-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+    .notes-list li {
+      border-left: 3px solid #000;
+      padding: 6pt 10pt;
+      margin-bottom: 8pt;
+      background: #f8f8f8;
+      page-break-inside: avoid;
+    }
+    .notes-list .note-date {
+      font-size: 8.5pt;
+      color: #555;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      margin-bottom: 4pt;
+    }
+    .notes-list .note-text {
+      font-size: 9.5pt;
+      white-space: pre-wrap;
+    }
+    .no-notes {
+      color: #777;
+      font-style: italic;
+      font-size: 9pt;
+    }
+
+    table.engagement-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 9pt;
+    }
+    table.engagement-table td {
+      padding: 5pt 8pt;
+      border: 1px solid #ddd;
+      text-align: center;
+    }
+    table.engagement-table td.label {
+      color: #555;
+      text-transform: uppercase;
+      font-size: 8pt;
+      letter-spacing: 0.04em;
+    }
+    table.engagement-table td.value {
+      font-family: "Liberation Mono", monospace;
+      font-size: 11pt;
+      font-weight: 700;
+    }
+
+    .exhibit-footer {
+      margin-top: 18pt;
+      font-size: 8.5pt;
+      color: #555;
+      text-align: center;
+      border-top: 1px solid #ccc;
+      padding-top: 6pt;
+    }
+  </style>
+</head>
+<body>
+
+  {# ---------------- COVER ---------------- #}
+  <section class="cover">
+    <div class="case-title">{{ t.cover_title }}</div>
+    <div class="set-name">{{ topic_set.name }}</div>
+    {% if topic_set.description %}
+      <div class="set-description">{{ topic_set.description }}</div>
+    {% endif %}
+    <div class="meta">
+      <div><span class="label">{{ t.generated_on }}</span> {{ generated_on }}</div>
+      <div><span class="label">{{ t.total_exhibits }}</span> {{ exhibits|length }}</div>
+    </div>
+  </section>
+
+  {# ---------------- INDEX ---------------- #}
+  <section class="index">
+    <h2>{{ t.index }}</h2>
+    <table class="index-table">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>{{ t.platform }}</th>
+          <th>{{ t.username }}</th>
+          <th>{{ t.posted }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for ex in exhibits %}
+        <tr>
+          <td class="num">{{ loop.index }}</td>
+          <td>{{ ex.platform }}</td>
+          <td>{{ ex.username or "—" }}</td>
+          <td>{{ ex.posted_str or "—" }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+
+  {# ---------------- EXHIBITS ---------------- #}
+  {% for ex in exhibits %}
+  <section class="exhibit">
+    <h2 class="exhibit-title">{{ t.exhibit }} {{ loop.index }} {{ t.of }} {{ exhibits|length }} — {{ ex.platform }}{% if ex.username %} / @{{ ex.username }}{% endif %}</h2>
+
+    {# Metadata table — forensic provenance #}
+    <table class="meta-table">
+      <tr>
+        <td class="label">{{ t.platform }}</td>
+        <td class="value">{{ ex.platform }}</td>
+      </tr>
+      <tr>
+        <td class="label">{{ t.username }}</td>
+        <td class="value">{{ ex.username or "—" }}</td>
+      </tr>
+      <tr>
+        <td class="label">{{ t.posted }}</td>
+        <td class="value">{{ ex.posted_str or "—" }}</td>
+      </tr>
+      <tr>
+        <td class="label">{{ t.captured }}</td>
+        <td class="value">{{ ex.captured_str or "—" }}</td>
+      </tr>
+      <tr>
+        <td class="label">{{ t.post_url }}</td>
+        <td class="value"><a href="{{ ex.post_url }}">{{ ex.post_url }}</a></td>
+      </tr>
+      {% if ex.sha256 %}
+      <tr>
+        <td class="label">{{ t.sha256 }}</td>
+        <td class="value">{{ ex.sha256 }}</td>
+      </tr>
+      {% endif %}
+      {% if ex.md5 %}
+      <tr>
+        <td class="label">{{ t.md5 }}</td>
+        <td class="value">{{ ex.md5 }}</td>
+      </tr>
+      {% endif %}
+      <tr>
+        <td class="label">{{ t.mhtml_captured }}</td>
+        <td class="value">{{ t.yes if ex.mhtml_captured else t.no }}</td>
+      </tr>
+      <tr>
+        <td class="label">{{ t.hashes_computed }}</td>
+        <td class="value">{{ t.yes if ex.hashes_computed else t.no }}</td>
+      </tr>
+    </table>
+
+    {# Verbatim text #}
+    {% if ex.text_content %}
+    <div class="section-label">{{ t.text_content }}</div>
+    <div class="text-content">{{ ex.text_content }}</div>
+    {% endif %}
+
+    {# Screenshot #}
+    {% if include_screenshots %}
+    <div class="section-label">{{ t.screenshot }}</div>
+    {% if ex.screenshot_data_uri %}
+    <div class="screenshot-block">
+      <img src="{{ ex.screenshot_data_uri }}" alt="screenshot">
+    </div>
+    {% else %}
+    <div class="screenshot-missing">{{ t.no_screenshot }}</div>
+    {% endif %}
+    {% endif %}
+
+    {# Notes #}
+    {% if include_notes %}
+    <div class="section-label">{{ t.notes }}</div>
+    {% if ex.notes and ex.notes|length > 0 %}
+    <ul class="notes-list">
+      {% for n in ex.notes %}
+      <li>
+        <div class="note-date">{{ t.added }}: {{ n.created_str or "—" }}</div>
+        <div class="note-text">{{ n.text }}</div>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <div class="no-notes">{{ t.no_notes }}</div>
+    {% endif %}
+    {% endif %}
+
+    {# Engagement #}
+    {% if include_engagement and ex.engagement %}
+    <div class="section-label">{{ t.engagement }}</div>
+    <table class="engagement-table">
+      <tr>
+        <td class="label">{{ t.likes }}</td>
+        <td class="label">{{ t.shares }}</td>
+        <td class="label">{{ t.comments }}</td>
+        <td class="label">{{ t.views }}</td>
+      </tr>
+      <tr>
+        <td class="value">{{ ex.engagement.get('likes', '—') }}</td>
+        <td class="value">{{ ex.engagement.get('shares', ex.engagement.get('retweets', '—')) }}</td>
+        <td class="value">{{ ex.engagement.get('comments', '—') }}</td>
+        <td class="value">{{ ex.engagement.get('views', '—') }}</td>
+      </tr>
+    </table>
+    {% endif %}
+
+    <div class="exhibit-footer">
+      {{ t.exhibit }} {{ loop.index }} {{ t.of }} {{ exhibits|length }}
+    </div>
+  </section>
+  {% endfor %}
+
+</body>
+</html>

@@ -232,6 +232,85 @@ const translations = {
     language: "Language",
     english: "English",
     spanish: "Español",
+
+    // Review Queue
+    reviewQueue: "Today's review queue",
+    markAllReviewed: "Mark all reviewed",
+    markReviewed: "Mark reviewed",
+    newBadge: "NEW",
+    newCount: "{count} new",
+    noNewPosts: "No new posts since last review",
+    recentlyCaptured: "Recently captured",
+    review: "Review",
+    untagged: "Untagged",
+    sources: "Sources",
+    selectSources: "Select sources…",
+    noSetMembership: "No set",
+
+    // Notes (extended)
+    noteAdded: "Note added",
+    notesCount: "{count} notes",
+    oneNote: "1 note",
+    writeNote: "Write a note…",
+    delete: "Delete",
+
+    // Archive flags (badge labels)
+    mhtmlCapturedBadge: "MHTML archive captured",
+    screenshotCapturedLabel: "Screenshot captured",
+    hashesComputedLabel: "Hashes computed",
+    mediaDownloadedLabel: "Media downloaded",
+
+    // Sets (extended)
+    noSetsYet: "No sets yet",
+    createNewSetAction: "Create new set",
+    manageSets: "Manage sets",
+    setName: "Set name",
+    inSets: "In sets",
+
+    // Keyboard shortcuts
+    keyboardShortcuts: "Keyboard shortcuts",
+    showShortcuts: "Show shortcuts",
+    shortcutNextPost: "Next post",
+    shortcutPrevPost: "Previous post",
+    shortcutOpenPost: "Open post",
+    shortcutTagPost: "Tag post",
+    shortcutNotePost: "Add note",
+    shortcutMarkReviewed: "Mark source reviewed",
+    shortcutOpenOriginal: "Open original in new tab",
+    shortcutToggleSelect: "Toggle selection",
+    shortcutShowHelp: "Show shortcuts",
+
+    // Export
+    export: "Export",
+    exportReport: "Export report",
+    exportFormat: "Format",
+    exportLocale: "Report language",
+    includeScreenshots: "Include screenshots",
+    includeNotes: "Include notes",
+    includeEngagement: "Include engagement counts",
+    formatPdfCase: "PDF case file",
+    formatZip: "ZIP archive",
+    formatCsv: "CSV",
+    formatJson: "JSON",
+    generating: "Generating…",
+    downloadStarted: "Download started",
+    exportFailed: "Export failed",
+
+    // Theme
+    theme: "Theme",
+    themeLight: "Light",
+    themeDark: "Dark",
+    themeSystem: "System",
+
+    // Filters
+    dateFrom: "From",
+    dateTo: "To",
+    clearFilters: "Clear filters",
+    filtersApplied: "{count} filters applied",
+
+    // Content language
+    contentLanguage: "Content language",
+    spanish2: "Spanish",
   },
   es: {
     // App
@@ -460,21 +539,116 @@ const translations = {
     language: "Idioma",
     english: "English",
     spanish: "Español",
+
+    // Review Queue
+    reviewQueue: "Cola de revisión",
+    markAllReviewed: "Marcar todo como revisado",
+    markReviewed: "Marcar como revisado",
+    newBadge: "NUEVO",
+    newCount: "{count} nuevos",
+    noNewPosts: "No hay publicaciones nuevas desde la última revisión",
+    recentlyCaptured: "Capturado recientemente",
+    review: "Revisar",
+    untagged: "Sin etiquetar",
+    sources: "Fuentes",
+    selectSources: "Seleccionar fuentes…",
+    noSetMembership: "Sin conjunto",
+
+    // Notes (extended)
+    noteAdded: "Nota agregada",
+    notesCount: "{count} notas",
+    oneNote: "1 nota",
+    writeNote: "Escribir una nota…",
+    delete: "Eliminar",
+
+    // Archive flags (badge labels)
+    mhtmlCapturedBadge: "Archivo MHTML capturado",
+    screenshotCapturedLabel: "Captura de pantalla guardada",
+    hashesComputedLabel: "Hashes calculados",
+    mediaDownloadedLabel: "Medios descargados",
+
+    // Sets (extended)
+    noSetsYet: "Aún no hay conjuntos",
+    createNewSetAction: "Crear nuevo conjunto",
+    manageSets: "Administrar conjuntos",
+    setName: "Nombre del conjunto",
+    inSets: "En conjuntos",
+
+    // Keyboard shortcuts
+    keyboardShortcuts: "Atajos de teclado",
+    showShortcuts: "Mostrar atajos",
+    shortcutNextPost: "Siguiente publicación",
+    shortcutPrevPost: "Publicación anterior",
+    shortcutOpenPost: "Abrir publicación",
+    shortcutTagPost: "Etiquetar publicación",
+    shortcutNotePost: "Agregar nota",
+    shortcutMarkReviewed: "Marcar fuente como revisada",
+    shortcutOpenOriginal: "Abrir original en nueva pestaña",
+    shortcutToggleSelect: "Alternar selección",
+    shortcutShowHelp: "Mostrar atajos",
+
+    // Export
+    export: "Exportar",
+    exportReport: "Exportar informe",
+    exportFormat: "Formato",
+    exportLocale: "Idioma del informe",
+    includeScreenshots: "Incluir capturas de pantalla",
+    includeNotes: "Incluir notas",
+    includeEngagement: "Incluir métricas de interacción",
+    formatPdfCase: "Expediente PDF",
+    formatZip: "Archivo ZIP",
+    formatCsv: "CSV",
+    formatJson: "JSON",
+    generating: "Generando…",
+    downloadStarted: "Descarga iniciada",
+    exportFailed: "La exportación falló",
+
+    // Theme
+    theme: "Tema",
+    themeLight: "Claro",
+    themeDark: "Oscuro",
+    themeSystem: "Sistema",
+
+    // Filters
+    dateFrom: "Desde",
+    dateTo: "Hasta",
+    clearFilters: "Limpiar filtros",
+    filtersApplied: "{count} filtros aplicados",
+
+    // Content language
+    contentLanguage: "Idioma del contenido",
+    spanish2: "Español",
   },
 } as const;
 
 export type TranslationKey = keyof typeof translations.en;
 
+/**
+ * tf(key, vars) — interpolated translation helper.
+ * Replaces {varName} placeholders in the translated string.
+ * Example: tf("newCount", { count: 5 }) → "5 new"
+ */
+export type InterpolationVars = Record<string, string | number>;
+
+function interpolate(str: string, vars: InterpolationVars): string {
+  return str.replace(/\{(\w+)\}/g, (_, k) =>
+    k in vars ? String(vars[k]) : `{${k}}`
+  );
+}
+
 interface I18nContextType {
   locale: Locale;
   setLocale: (locale: Locale) => void;
   t: (key: TranslationKey) => string;
+  /** Interpolated translation: replaces {varName} placeholders. */
+  tf: (key: TranslationKey, vars: InterpolationVars) => string;
 }
 
 const I18nContext = createContext<I18nContextType>({
   locale: "en",
   setLocale: () => {},
   t: (key) => key,
+  tf: (key, vars) => interpolate(key, vars),
 });
 
 export function I18nProvider({ children }: { children: ReactNode }) {
@@ -496,8 +670,12 @@ export function I18nProvider({ children }: { children: ReactNode }) {
     return translations[locale][key] ?? translations.en[key] ?? key;
   };
 
+  const tf = (key: TranslationKey, vars: InterpolationVars): string => {
+    return interpolate(t(key), vars);
+  };
+
   return (
-    <I18nContext.Provider value={{ locale, setLocale, t }}>
+    <I18nContext.Provider value={{ locale, setLocale, t, tf }}>
       {children}
     </I18nContext.Provider>
   );

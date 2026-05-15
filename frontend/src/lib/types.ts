@@ -62,6 +62,7 @@ export interface Post {
   media_files: MediaFile[];
   set_ids: string[];
   notes_count: number;
+  content_language?: string | null;
 }
 
 export interface PostListResponse {

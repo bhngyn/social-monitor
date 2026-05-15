@@ -5,12 +5,31 @@
 @layer base {
   :root {
     --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --border: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    --foreground: 222 47% 11%;
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+    --muted: 210 40% 96%;
+    --muted-foreground: 215 16% 47%;
+    --border: 214 32% 91%;
+    --input: 214 32% 91%;
+    --accent: 210 40% 96%;
+    --accent-foreground: 222 47% 11%;
+    --ring: 215 20% 65%;
     --radius: 0.5rem;
+  }
+
+  .dark {
+    --background: 222 47% 6%;
+    --foreground: 210 40% 98%;
+    --card: 222 47% 9%;
+    --card-foreground: 210 40% 98%;
+    --muted: 217 33% 17%;
+    --muted-foreground: 215 20% 65%;
+    --border: 217 33% 20%;
+    --input: 217 33% 20%;
+    --accent: 217 33% 17%;
+    --accent-foreground: 210 40% 98%;
+    --ring: 215 20% 65%;
   }
 
   * {
@@ -18,17 +37,30 @@
   }
 
   body {
-    background-color: white;
+    background-color: hsl(var(--background));
     color: hsl(var(--foreground));
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     font-feature-settings: "rlig" 1, "calt" 1;
   }
+
+  button:focus-visible,
+  a:focus-visible,
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible,
+  [role="button"]:focus-visible,
+  [tabindex]:not([tabindex="-1"]):focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
+  }
 }
 
 @layer components {
   .card {
-    @apply rounded-lg border bg-white p-6 shadow-sm;
+    @apply rounded-lg border p-6 shadow-sm;
+    background-color: hsl(var(--card));
+    color: hsl(var(--card-foreground));
   }
 
   .badge {
@@ -61,7 +93,9 @@
   }
 
   .btn-secondary {
-    @apply btn border bg-white hover:bg-slate-50;
+    @apply btn border hover:bg-slate-50 dark:hover:bg-slate-800;
+    background-color: hsl(var(--card));
+    color: hsl(var(--card-foreground));
   }
 
   .btn-danger {

@@ -37,6 +37,7 @@ class PostResponse(BaseModel):
     platform_post_id: str
     post_url: str
     text_content: str | None = None
+    content_language: str | None = None
     post_timestamp: datetime | None = None
 
     engagement: dict = {}
