@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, Download, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useI18n } from "@/lib/i18n";
+import { ExportReportDialog } from "@/components/sets/ExportReportDialog";
 
 interface TopicSet {
   id: string;
@@ -30,7 +31,7 @@ export default function SetDetailPage() {
   const [set, setSet] = useState<TopicSet | null>(null);
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
-  const [exporting, setExporting] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
   const { t } = useI18n();
 
   useEffect(() => {
@@ -57,28 +58,6 @@ export default function SetDetailPage() {
     setPosts(posts.filter((p) => p.id !== postId));
   };
 
-  const handleExport = async (format: string) => {
-    setExporting(true);
-    try {
-      const res = await fetch(`/api/export/set/${params.id}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ format }),
-      });
-      if (res.ok) {
-        const blob = await res.blob();
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = `${set?.name || "export"}.${format === "zip" ? "zip" : format}`;
-        a.click();
-        URL.revokeObjectURL(url);
-      }
-    } finally {
-      setExporting(false);
-    }
-  };
-
   if (loading) return <div className="p-6 text-center text-gray-500">{t("loading")}</div>;
   if (!set) return <div className="p-6 text-center text-gray-500">Set not found</div>;
 
@@ -98,26 +77,12 @@ export default function SetDetailPage() {
           </div>
         </div>
         <div className="flex gap-2">
+          {/* Export Report button — opens rich dialog */}
           <button
-            onClick={() => handleExport("csv")}
-            disabled={exporting}
-            className="flex items-center gap-2 border px-3 py-2 rounded-lg hover:bg-gray-50 text-sm"
+            onClick={() => setExportOpen(true)}
+            className="flex items-center gap-2 bg-slate-900 text-white px-3 py-2 rounded-lg hover:bg-slate-800 text-sm transition-colors"
           >
-            <Download className="w-4 h-4" /> CSV
-          </button>
-          <button
-            onClick={() => handleExport("json")}
-            disabled={exporting}
-            className="flex items-center gap-2 border px-3 py-2 rounded-lg hover:bg-gray-50 text-sm"
-          >
-            <Download className="w-4 h-4" /> JSON
-          </button>
-          <button
-            onClick={() => handleExport("zip")}
-            disabled={exporting}
-            className="flex items-center gap-2 bg-blue-600 text-white px-3 py-2 rounded-lg hover:bg-blue-700 text-sm"
-          >
-            <Download className="w-4 h-4" /> {t("zipArchive")}
+            <Download className="w-4 h-4" /> {t("export")}
           </button>
         </div>
       </div>
@@ -159,6 +124,14 @@ export default function SetDetailPage() {
           </div>
         )}
       </div>
+
+      {/* Export dialog */}
+      <ExportReportDialog
+        setId={String(params.id)}
+        setName={set.name}
+        open={exportOpen}
+        onClose={() => setExportOpen(false)}
+      />
     </div>
   );
 }
