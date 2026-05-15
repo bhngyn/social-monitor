@@ -20,6 +20,7 @@ from app.models.hash import FileHash
 from app.models.note import PostNote
 from app.models.post import Post
 from app.models.topic_set import SetMembership, TopicSet
+from app.services.pdf_report import render_set_pdf
 
 router = APIRouter()
 
@@ -56,6 +57,21 @@ async def export_set(
         return _export_csv(topic_set, posts)
     elif format == "zip":
         return await _export_zip(topic_set, posts, db)
+    elif format == "pdf":
+        locale = data.get("locale", "en")
+        pdf_bytes, filename = await render_set_pdf(
+            set_id,
+            db,
+            locale=locale,
+            include_screenshots=data.get("include_screenshots", True),
+            include_notes=data.get("include_notes", True),
+            include_engagement=data.get("include_engagement", True),
+        )
+        return StreamingResponse(
+            io.BytesIO(pdf_bytes),
+            media_type="application/pdf",
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        )
     else:
         return _export_json(topic_set, posts)
 
