@@ -36,11 +36,6 @@ const PLATFORMS = [
   "instagram",
   "youtube",
   "tiktok",
-  "reddit",
-  "linkedin",
-  "bluesky",
-  "mastodon",
-  "threads",
 ];
 
 const PER_PAGE = 20;
@@ -60,7 +55,6 @@ function PostsPageInner() {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [hasMedia, setHasMedia] = useState(false);
-  const [sortBy, setSortBy] = useState("posted_at");
   const [selectedPosts, setSelectedPosts] = useState<Set<string>>(new Set());
   const [selectedSets, setSelectedSets] = useState<string[]>([]);
   const [untagged, setUntagged] = useState(false);
@@ -80,7 +74,6 @@ function PostsPageInner() {
     date_from: dateFrom || undefined,
     date_to: dateTo || undefined,
     has_media: hasMedia ? true : undefined,
-    sort: sortBy,
     set_id: selectedSets.length ? selectedSets.join(",") : undefined,
     source_id: selectedSources.length
       ? selectedSources.join(",")
@@ -428,25 +421,6 @@ function PostsPageInner() {
                 selectedIds={selectedSources}
                 onChange={handleSourcesChange}
               />
-            </div>
-
-            {/* Sort */}
-            <div>
-              <h3 className="text-xs font-semibold text-slate-500 uppercase mb-2">
-                {t("sort")}
-              </h3>
-              <select
-                value={sortBy}
-                onChange={(e) => {
-                  setSortBy(e.target.value);
-                  setPage(1);
-                }}
-                className="w-full rounded border border-slate-200 px-2 py-1 text-xs"
-              >
-                <option value="posted_at">{t("newestFirst")}</option>
-                <option value="-posted_at">{t("oldestFirst")}</option>
-                <option value="collected_at">{t("recentlyCollected")}</option>
-              </select>
             </div>
 
             {activeFilterCount > 0 && (

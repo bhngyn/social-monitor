@@ -1,0 +1,1047 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Social Monitor — Team User Guide</title>
+<style>
+/* ============================================================
+   DESIGN TOKENS
+   ============================================================ */
+:root {
+  --bg: #fafaf7;
+  --surface-1: #fafaf7;
+  --surface-2: #ffffff;
+  --fg: #1a1a1a;
+  --muted: #666;
+  --line: #d9d9d4;
+  --accent: #2a4d3e;
+  --accent-fg: #ffffff;
+  --accent-hover: #22402f;
+  --accent-soft: #e2ede7;
+  --warn-bg: #fff4d6;
+  --warn-fg: #6b4f00;
+  --err-bg: #ffe2e0;
+  --err-fg: #7d1a13;
+  --ok-bg: #def0e0;
+  --ok-fg: #1f4d28;
+  --serif: "Iowan Old Style", "Garamond", "Georgia", serif;
+  --sans: -apple-system, "Inter", "Segoe UI", system-ui, sans-serif;
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --space-1: 0.25rem; --space-2: 0.5rem; --space-3: 0.75rem;
+  --space-4: 1rem;    --space-5: 1.5rem;  --space-6: 2rem;
+  --radius-sm: 4px; --radius-md: 8px; --radius-pill: 999px;
+  --shadow-sm: 0 1px 2px rgba(0,0,0,.04);
+  --shadow-md: 0 4px 12px rgba(0,0,0,.06);
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  background: var(--surface-1);
+  color: var(--fg);
+  font-family: var(--sans);
+  font-size: 16px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+.wrap {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  gap: var(--space-6);
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: var(--space-5);
+}
+
+/* ---- Sticky TOC ---- */
+nav.toc {
+  position: sticky;
+  top: var(--space-5);
+  align-self: start;
+  font-size: 0.92rem;
+  border-right: 1px solid var(--line);
+  padding-right: var(--space-4);
+}
+nav.toc h2 {
+  font-family: var(--serif);
+  font-size: 1.05rem;
+  font-weight: 600;
+  margin: 0 0 var(--space-3);
+  color: var(--accent);
+}
+nav.toc ol { list-style: none; margin: 0; padding: 0; counter-reset: section; }
+nav.toc li { margin: 0; counter-increment: section; }
+nav.toc a {
+  display: block;
+  padding: var(--space-1) 0 var(--space-1) var(--space-4);
+  color: var(--fg);
+  text-decoration: none;
+  border-left: 2px solid transparent;
+  line-height: 1.35;
+  margin-left: 2px;
+  font-size: 0.88rem;
+}
+nav.toc a::before {
+  content: counter(section) ". ";
+  color: var(--muted);
+  margin-right: 0.2em;
+}
+nav.toc a:hover { color: var(--accent); }
+nav.toc a.active {
+  color: var(--accent);
+  border-left-color: var(--accent);
+  background: var(--accent-soft);
+  font-weight: 500;
+}
+
+/* ---- Main content ---- */
+main { min-width: 0; font-family: var(--sans); }
+header.lead {
+  border-bottom: 1px solid var(--line);
+  margin-bottom: var(--space-6);
+  padding-bottom: var(--space-5);
+}
+header.lead .brand {
+  font-family: var(--serif);
+  font-size: 1.05rem;
+  color: var(--muted);
+  margin-bottom: var(--space-2);
+}
+header.lead .brand-mark { color: var(--accent); font-weight: 500; }
+header.lead h1 {
+  font-family: var(--serif);
+  font-size: 2.4rem;
+  font-weight: 600;
+  margin: 0 0 var(--space-3);
+  line-height: 1.2;
+}
+header.lead .tagline {
+  color: var(--muted);
+  font-size: 1.05rem;
+  margin: 0;
+  max-width: 60ch;
+}
+section {
+  margin-bottom: var(--space-6);
+  scroll-margin-top: var(--space-4);
+}
+section h2 {
+  font-family: var(--serif);
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--accent);
+  margin: 0 0 var(--space-3);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--line);
+}
+section:first-of-type h2 { border-top: none; padding-top: 0; }
+section h3 {
+  font-family: var(--serif);
+  font-size: 1.15rem;
+  font-weight: 600;
+  margin: var(--space-5) 0 var(--space-2);
+}
+section p { margin: var(--space-3) 0; max-width: 65ch; }
+section ul, section ol { max-width: 65ch; padding-left: 1.25rem; }
+section li { margin: var(--space-2) 0; }
+section li > p:first-child { margin-top: 0; }
+section li > p:last-child { margin-bottom: 0; }
+section a { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }
+section a:hover { color: var(--accent-hover); }
+code, .mono {
+  font-family: var(--mono);
+  font-size: 0.9em;
+  background: var(--surface-2);
+  padding: 0.08em 0.35em;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line);
+}
+kbd {
+  font-family: var(--mono);
+  font-size: 0.8em;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-bottom-width: 2px;
+  border-radius: var(--radius-sm);
+  padding: 0.05em 0.4em;
+  color: var(--fg);
+  white-space: nowrap;
+}
+pre {
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-4);
+  overflow-x: auto;
+  font-size: 0.85rem;
+  line-height: 1.45;
+}
+pre code { background: none; border: none; padding: 0; font-size: inherit; }
+
+/* ---- Figures (framed screenshots) ---- */
+figure {
+  margin: var(--space-5) 0;
+  padding: 0;
+}
+figure .placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 160px;
+  border: 1px dashed var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-style: italic;
+  text-align: center;
+  padding: var(--space-4);
+}
+figure figcaption {
+  font-size: 0.85rem;
+  color: var(--muted);
+  margin-top: var(--space-2);
+  font-style: italic;
+  text-align: center;
+  padding: 0 var(--space-4);
+}
+
+/* ---- Status chips ---- */
+.chip {
+  display: inline-block;
+  padding: 0.1em 0.55em;
+  font-size: 0.78rem;
+  font-weight: 500;
+  border-radius: var(--radius-pill);
+  vertical-align: 0.05em;
+  margin-right: 0.3em;
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  color: var(--muted);
+  white-space: nowrap;
+  line-height: 1.6;
+}
+.chip.robust { background: var(--ok-bg); color: var(--ok-fg); border-color: #b8d8be; }
+.chip.best-effort { background: var(--warn-bg); color: var(--warn-fg); border-color: #e5d29a; }
+.chip.manual { background: var(--err-bg); color: var(--err-fg); border-color: #e7c0bd; }
+.chip.note { background: var(--accent-soft); color: var(--accent); border-color: #c2d7cc; }
+
+/* ---- Callout boxes ---- */
+.callout {
+  margin: var(--space-4) 0;
+  padding: var(--space-3) var(--space-4);
+  border-left: 3px solid var(--accent);
+  background: var(--accent-soft);
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+  font-size: 0.95rem;
+}
+.callout.warn {
+  border-left-color: #b88c00;
+  background: var(--warn-bg);
+  color: var(--warn-fg);
+}
+.callout p:first-child { margin-top: 0; }
+.callout p:last-child { margin-bottom: 0; }
+.callout strong { font-weight: 600; }
+
+/* ---- Status / source-support matrix table ---- */
+table.matrix {
+  border-collapse: collapse;
+  width: 100%;
+  max-width: 100%;
+  margin: var(--space-4) 0;
+  font-size: 0.9rem;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+table.matrix th, table.matrix td {
+  text-align: left;
+  padding: var(--space-3) var(--space-3);
+  vertical-align: top;
+  border-bottom: 1px solid var(--line);
+}
+table.matrix thead th {
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 600;
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+table.matrix tbody tr:last-child td { border-bottom: none; }
+table.matrix tbody td:first-child { font-weight: 600; white-space: nowrap; }
+table.matrix tbody td { line-height: 1.4; }
+
+/* ---- Footer ---- */
+footer.end {
+  margin-top: var(--space-6);
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--line);
+  font-size: 0.85rem;
+  color: var(--muted);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+footer.end .ornament { color: var(--accent); opacity: 0.55; font-size: 1.2rem; }
+
+/* ---- Responsive ---- */
+@media (max-width: 800px) {
+  .wrap { grid-template-columns: 1fr; gap: var(--space-4); padding: var(--space-3); }
+  nav.toc {
+    position: static;
+    border-right: none;
+    border-bottom: 1px solid var(--line);
+    padding-right: 0;
+    padding-bottom: var(--space-3);
+    margin-bottom: var(--space-3);
+  }
+  header.lead h1 { font-size: 1.8rem; }
+  table.matrix { font-size: 0.82rem; }
+}
+
+/* ---- Print ---- */
+@media print {
+  body { background: white; }
+  .wrap { display: block; max-width: none; padding: 0; }
+  nav.toc { display: none; }
+  figure { page-break-inside: avoid; }
+  section h2 { page-break-after: avoid; }
+  footer.end { border-top: 1px solid #ccc; }
+  a { color: inherit; text-decoration: none; }
+  a::after { content: ""; }
+}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+  <nav class="toc" aria-label="Table of contents">
+    <h2>Contents</h2>
+    <ol>
+      <li><a href="#what-it-is">What this is</a></li>
+      <li><a href="#layout">Sidebar &amp; layout</a></li>
+      <li><a href="#dashboard">Review queue (dashboard)</a></li>
+      <li><a href="#posts">Posts</a></li>
+      <li><a href="#post-detail">Post detail</a></li>
+      <li><a href="#sources">Sources</a></li>
+      <li><a href="#sets">Topic sets</a></li>
+      <li><a href="#alerts">Alerts</a></li>
+      <li><a href="#timeline">Timeline</a></li>
+      <li><a href="#runs">Ingestion runs</a></li>
+      <li><a href="#audit">Audit log</a></li>
+      <li><a href="#storage">Storage &amp; retention</a></li>
+      <li><a href="#platform-matrix">Platform support matrix</a></li>
+      <li><a href="#reliability">Reliability &amp; background machinery</a></li>
+      <li><a href="#limits">Known limitations</a></li>
+      <li><a href="#rules">Where the rules live</a></li>
+    </ol>
+  </nav>
+
+  <main>
+
+    <header class="lead">
+      <p class="brand"><span class="brand-mark">§</span> Social Monitor</p>
+      <h1>Team User Guide</h1>
+      <p class="tagline">Self-hosted social-media archiving and monitoring — what each surface does, where it falls back, and where the rules live.</p>
+    </header>
+
+    <!-- ============================================================
+         §1 — What this is
+         ============================================================ -->
+    <section id="what-it-is">
+      <h2>What this is</h2>
+      <p>
+        <strong>Social Monitor</strong> ingests posts from Twitter, Instagram,
+        Facebook, TikTok, and YouTube through Apify, captures full-page MHTML,
+        screenshots, and original media, and surfaces them through a Next.js
+        dashboard with alerting, topic sets, retention policies, and an audit
+        log.
+      </p>
+      <p>
+        It runs as a docker-compose stack on a single host. The frontend lives
+        at <code>http://localhost:3000</code>, the API at <code>http://localhost:8000</code>
+        (CORS-locked to <code>:3000</code>). Archived media lives on an external
+        drive mounted as <code>archive_data/</code>; nothing on the page is
+        served from a CDN.
+      </p>
+      <p>Scope:</p>
+      <ul>
+        <li>Archives public posts from configured sources and stores them durably.</li>
+        <li>Surfaces a review queue, full-text search, topic sets, and keyword alerts.</li>
+        <li>Does <strong>not</strong> log into private accounts, scrape behind paywalls, or post anywhere.</li>
+        <li>Does <strong>not</strong> moderate content — the operator decides what to do with each post.</li>
+      </ul>
+    </section>
+
+    <!-- ============================================================
+         §2 — Sidebar & layout
+         ============================================================ -->
+    <section id="layout">
+      <h2>Sidebar &amp; layout</h2>
+      <p>
+        Every page sits inside a fixed dark-slate sidebar on the left and a
+        light content pane on the right. The sidebar can be collapsed to icons
+        with the chevron at the top.
+      </p>
+
+      <figure>
+        <div class="placeholder">Screenshot — collapsed and expanded sidebar side-by-side.</div>
+        <figcaption>The nine nav items in order: Dashboard, Sources, Posts, Timeline, Topic Sets, Alerts, Runs, Audit Log, Settings.</figcaption>
+      </figure>
+
+      <ul>
+        <li><strong>Active item</strong> — current route is highlighted with a darker slate background. Dashboard matches only <code>/</code>; everything else matches by prefix, so <code>/posts/abc</code> still highlights "Posts".</li>
+        <li><strong>"New" badge on Posts</strong> — a red pill with a count appears next to "Posts" when there are unreviewed posts in the recent 200-post sample. <span class="chip note">collapsed</span> shows a red dot instead of the pill.</li>
+        <li><strong>Collapse toggle</strong> — chevron in the header. Keyboard focus survives; tooltips appear on hover when collapsed.</li>
+      </ul>
+    </section>
+
+    <!-- ============================================================
+         §3 — Review queue (dashboard)
+         ============================================================ -->
+    <section id="dashboard">
+      <h2>Review queue (dashboard)</h2>
+      <p>
+        <code>/</code> is the entry surface. It groups unreviewed posts by
+        source so the operator can clear one account at a time rather than
+        scroll a flat feed.
+      </p>
+
+      <figure>
+        <div class="placeholder">Screenshot — review queue with two source cards, recently-captured collapsed open, four stat tiles at bottom.</div>
+        <figcaption>Each source card shows the platform label, username, count, and up to three preview lines.</figcaption>
+      </figure>
+
+      <h3>Source group</h3>
+      <ul>
+        <li><strong>Header</strong> — platform name (colored text label, not an icon — see <a href="#platform-matrix">platform matrix</a>), <code>@username</code>, and "· N new" count.</li>
+        <li><strong>Preview list</strong> — up to three unreviewed posts, each showing a relative timestamp and a single line of text (clipped). Clicking a row opens the post detail page.</li>
+        <li><strong>Review button</strong> (right side) — navigates to <code>/posts?source_id=…</code>, which pre-filters the posts page to just that source.</li>
+      </ul>
+
+      <h3>Affordances</h3>
+      <ul>
+        <li><strong>Mark all reviewed</strong> (top right, only when there are groups) — sets every visible source to reviewed in one click. Stored client-side in localStorage; see <a href="#limits">limitations</a>.</li>
+        <li><strong>Recently captured</strong> — collapsible section showing the 10 most recent posts across all sources, regardless of review state. Toggle with the chevron.</li>
+        <li><strong>Stats footer</strong> — four compact tiles: <em>Total sources</em>, <em>Total posts</em>, <em>Posts today</em>, <em>Storage used</em>. "Storage used" is the archive size reported by <code>/api/storage/stats</code>, formatted with <code>formatBytes</code>.</li>
+      </ul>
+
+      <h3>Empty states</h3>
+      <ul>
+        <li><strong>No unreviewed posts</strong> — inbox icon with "No new posts" message. Recently-captured section still renders below.</li>
+        <li><strong>No sources configured</strong> — same empty state applies; total counts stay at zero.</li>
+      </ul>
+
+      <div class="callout">
+        <p><strong>Sample window.</strong> The dashboard fetches the most recent 200 posts to compute groups and "new" counts. Older unreviewed posts still exist in the archive, but the dashboard won't surface them — use <code>/posts</code> with explicit filters to find them.</p>
+      </div>
+    </section>
+
+    <!-- ============================================================
+         §4 — Posts
+         ============================================================ -->
+    <section id="posts">
+      <h2>Posts <span class="chip robust">robust</span></h2>
+      <p>
+        The browse-and-search surface. Left rail holds filters; main column
+        holds either a feed of cards (default) or a 2–4 column thumbnail grid.
+        Pagination is 20 per page.
+      </p>
+
+      <figure>
+        <div class="placeholder">Screenshot — feed view with one card focused (blue ring), filter panel showing two filters applied, "5 new" banner at top.</div>
+        <figcaption>Focused card has a blue ring. Both selection and keyboard focus use the same ring style.</figcaption>
+      </figure>
+
+      <h3>Filter rail (240px, left)</h3>
+      <ul>
+        <li><strong>Platform</strong> — five checkboxes (Twitter, Facebook, Instagram, YouTube, TikTok), multi-select. Changing any resets to page 1.</li>
+        <li><strong>Date range</strong> — two HTML date inputs (<em>from</em> / <em>to</em>), both optional. Changing either resets to page 1.</li>
+        <li><strong>Has media</strong> — single checkbox; filters to posts with attached image/video files.</li>
+        <li><strong>Topic sets</strong> — list of all sets with the set's colored dot beside the name. Each is a multi-select checkbox.</li>
+        <li><strong>Untagged</strong> — checkbox above the set list. When ticked it greys out the set list and filters to posts not in any set.</li>
+        <li><strong>Source</strong> — searchable dropdown (<code>SourcePicker</code> component), multi-select.</li>
+        <li><strong>"N filters applied"</strong> — small blue text appears when ≥ 1 filter is active.</li>
+        <li><strong>Clear filters</strong> — only renders when ≥ 1 filter is active; resets all filters and pagination.</li>
+      </ul>
+
+      <p>The search bar sits above the filter rail, in the main column. It submits on Enter or the <em>Search</em> button — typing alone does <strong>not</strong> debounce a query.</p>
+
+      <h3>Feed view (card)</h3>
+      <p>Each card carries, in order:</p>
+      <ul>
+        <li>Checkbox (selection), platform label, <code>@username</code>, relative timestamp.</li>
+        <li><span class="chip note">NEW</span> badge — blue uppercase pill, shown when the post has not been reviewed.</li>
+        <li>Content-language chip — small uppercase tag (e.g. <code>EN</code>), shown only if the post's language differs from the current UI locale.</li>
+        <li>Up to three lines of text (clamped), then an optional image thumbnail (cover-fit, 160px tall).</li>
+        <li>Chip row, when non-empty: topic-set badges (in the set's color), notes count (pill button, opens an inline note panel), and small icons for <code>mhtml_captured</code>, <code>screenshot_captured</code>, <code>hashes_computed</code> — each is an icon-only marker with a tooltip.</li>
+        <li>Footer row: likes, shares (retweets/reposts), comments — counts only, no thumbs-up; and a <code>PostCardActions</code> menu on the right.</li>
+      </ul>
+
+      <h3>Grid view</h3>
+      <p>2–4 column grid of thumbnails. If the post has no image, the cell shows a grey panel with the post text clipped to four lines. The card footer is reduced to just the source username. Clicking anywhere navigates to the post detail.</p>
+
+      <h3>Selection &amp; review banners</h3>
+      <ul>
+        <li><strong>Unreviewed banner</strong> — appears above the list when any visible post is unreviewed: "N new" with a <em>Mark all reviewed</em> button on the right. Applies to the currently-filtered view only.</li>
+        <li><strong>Selection banner</strong> — appears when ≥ 1 checkbox is ticked: "N selected" with an X to clear selection. The bulk-action surface itself (e.g. add-to-set) lives in <code>PostCardActions</code> per card; see the per-card menu, not this banner.</li>
+      </ul>
+
+      <h3>Keyboard shortcuts</h3>
+      <p>Active only on <code>/posts</code> and only when the list has at least one post. The blue ring on a card marks keyboard focus.</p>
+      <ul>
+        <li><kbd>j</kbd> — focus next post (scrolls into view).</li>
+        <li><kbd>k</kbd> — focus previous post.</li>
+        <li><kbd>Enter</kbd> or <kbd>o</kbd> — open focused post detail in the same tab.</li>
+        <li><kbd>Shift</kbd>+<kbd>O</kbd> — open the original post on its platform in a new tab (only if <code>post_url</code> is set).</li>
+        <li><kbd>x</kbd> — toggle selection on the focused post.</li>
+        <li><kbd>s</kbd> — mark the focused post's <em>source</em> as reviewed (drops the NEW badge from every post on that source).</li>
+        <li><kbd>Shift</kbd>+<kbd>?</kbd> — open/close the shortcuts overlay.</li>
+      </ul>
+
+      <div class="callout warn">
+        <p><strong>The shortcut overlay lists more than is wired.</strong> The overlay shows <kbd>t</kbd> (tag) and <kbd>n</kbd> (note) entries, but the posts page does not currently bind them — pressing them does nothing. See <a href="#limits">known limitations</a>.</p>
+      </div>
+
+      <h3>Edge cases</h3>
+      <ul>
+        <li><strong>Empty filter result</strong> — inbox icon with "No posts found / Adjust filters". Pagination disappears.</li>
+        <li><strong>Loading</strong> — the page falls back to "Loading…" (the search-params Suspense fallback) before SWR resolves.</li>
+        <li><strong>Search not submitted</strong> — typing in the search box does not query; you must press Enter or the Search button. Other filters apply on change.</li>
+        <li><strong>Grid + no image</strong> — falls back to the text-only grey panel; thumbnails are never generated for video-only posts.</li>
+      </ul>
+    </section>
+
+    <!-- ============================================================
+         §5 — Post detail
+         ============================================================ -->
+    <section id="post-detail">
+      <h2>Post detail</h2>
+      <p>
+        <code>/posts/[id]</code>. Two-column layout: left panel is 60% wide and
+        scrolls; right panel is 40% wide and sticky.
+      </p>
+
+      <figure>
+        <div class="placeholder">Screenshot — full post detail with metadata grid, engagement row, topic-set chips, notes input, and the sticky media viewer on the right.</div>
+        <figcaption>The right panel stays visible while the left scrolls through metadata, sets, notes, and raw JSON.</figcaption>
+      </figure>
+
+      <h3>Left panel — top to bottom</h3>
+      <ul>
+        <li><strong>Header card</strong> — platform label, source username, relative timestamp, and an external-link icon (only when <code>post_url</code> is set). Below it: the full post text with whitespace preserved.</li>
+        <li><strong>Metadata grid</strong> — two-column grid of <code>&lt;dt&gt;/&lt;dd&gt;</code>: platform, platform post ID (monospace), posted timestamp, archived timestamp, and four yes/no rows for <em>media downloaded</em>, <em>MHTML captured</em>, <em>screenshot</em>, <em>hashes computed</em>.</li>
+        <li><strong>Engagement</strong> — likes (heart), shares (repeat), comments (speech bubble), and views (eye, only when &gt; 0). Below the icon row, every raw <code>engagement</code> key is dumped as small "label: value" pairs — useful when a platform returns custom fields.</li>
+        <li><strong>Platform data</strong> — same flat key/value rendering, populated from <code>post.platform_data</code>. Only renders if the object is non-empty. Nested values are JSON-stringified inline.</li>
+        <li><strong>Topic sets</strong> — colored pill per set, each linking to the set page. A dashed-border <em>Add to set</em> button opens a dropdown of all sets; clicking one adds the post immediately. "Not in any sets" when empty.</li>
+        <li><strong>Notes</strong> — heading shows the count. There is an input plus Add button; submitting POSTs a new note. <em>Existing notes are not rendered on this page</em> — only the count and the add control. To see notes, use the inline notes panel from the post card on <code>/posts</code>.</li>
+        <li><strong>Raw JSON</strong> — collapsible. When open, dumps <code>JSON.stringify(post, null, 2)</code> into a <code>max-h-96</code> scroll container.</li>
+      </ul>
+
+      <h3>Right panel</h3>
+      <ul>
+        <li><strong>Sticky media viewer</strong> — renders any attached <code>media_files</code> plus the MHTML and screenshot paths. When the post has no media and no captures, falls back to a card reading "No media files".</li>
+      </ul>
+
+      <h3>Edge cases</h3>
+      <ul>
+        <li><strong>Loading</strong> — centered spinner.</li>
+        <li><strong>Fetch error</strong> — heading plus the error message and a "Back to posts" link. Triggered if the ID is unknown or the API is unreachable.</li>
+        <li><strong>Notes not displayed</strong> — by design on this surface; only the count is shown. The card-level inline notes panel renders them.</li>
+      </ul>
+    </section>
+
+    <!-- ============================================================
+         §6 — Sources
+         ============================================================ -->
+    <section id="sources">
+      <h2>Sources <span class="chip robust">robust</span></h2>
+      <p>
+        Each row is one account on one platform. Adding a source schedules it
+        for polling by the Celery beat scheduler; the cadence is read from the
+        DB row, not a cron file.
+      </p>
+
+      <figure>
+        <div class="placeholder">Screenshot — sources table with one row active and another inactive, edit modal open over the table.</div>
+        <figcaption>Active toggle flips state on click with no confirmation. Edit and delete sit in the actions column.</figcaption>
+      </figure>
+
+      <h3>Table columns</h3>
+      <ul>
+        <li><strong>Platform</strong> — colored text label.</li>
+        <li><strong>User</strong> — avatar circle (first letter of username) + username, linked to <code>/sources/[id]</code>.</li>
+        <li><strong>Display name</strong> — optional; "—" if empty.</li>
+        <li><strong>Posts</strong> — archived count from <code>post_count</code>.</li>
+        <li><strong>Last polled</strong> — relative time, or "never".</li>
+        <li><strong>Active</strong> — switch-style toggle. Green when on, slate when off. Click toggles immediately; no confirmation.</li>
+        <li><strong>Actions</strong> — pencil (edit) and trash (delete).</li>
+      </ul>
+
+      <h3>Add / Edit modal</h3>
+      <ul>
+        <li>Fields: platform (select, required), username (text, required), profile URL (URL, optional), poll interval in seconds (number, min 60, default 3600).</li>
+        <li><code>platform_id</code> defaults to the username if left blank.</li>
+        <li>Errors render in a red box at the top of the form. Save button shows a spinner while saving.</li>
+        <li>X in the header closes without saving.</li>
+      </ul>
+
+      <h3>Edge cases</h3>
+      <ul>
+        <li><strong>Delete</strong> — browser <code>confirm()</code> with the localized confirmation text. Cancel aborts; OK fires the DELETE.</li>
+        <li><strong>Toggle failure</strong> — falls back to a browser <code>alert()</code> with the localized error and leaves the row in its current state until the SWR refresh.</li>
+        <li><strong>Inactive source</strong> — the beat scheduler skips it on its next pass; no posts are deleted.</li>
+      </ul>
+    </section>
+
+    <!-- ============================================================
+         §7 — Topic sets
+         ============================================================ -->
+    <section id="sets">
+      <h2>Topic sets <span class="chip robust">robust</span></h2>
+      <p>
+        Labels with colors used to group posts across sources. A post can
+        belong to many sets; the set color is reused on post cards and
+        detail-page chips.
+      </p>
+
+      <figure>
+        <div class="placeholder">Screenshot — sets grid with three cards in different colors, inline create form visible above.</div>
+        <figcaption>The color picker is a native <code>&lt;input type="color"&gt;</code>; whatever hex is chosen is reused in the post-card chip.</figcaption>
+      </figure>
+
+      <ul>
+        <li><strong>Grid</strong> — responsive 1–3 column grid of cards. Each card shows a colored dot, name, optional description (2-line clamp), and a post count.</li>
+        <li><strong>New set</strong> — opens an inline form above the grid: name (required), description (textarea, optional), color (HTML color picker, default <code>#3B82F6</code>).</li>
+        <li><strong>Delete</strong> — trash icon on the card, confirmed via browser <code>confirm()</code>. Posts are not deleted — only set membership.</li>
+        <li><strong>Empty state</strong> — folder icon, "No topic sets yet", with a hint.</li>
+      </ul>
+
+      <div class="callout warn">
+        <p><strong>Create errors fail silently.</strong> If the create POST returns non-OK, the form does not surface an error — the page just doesn't refresh. Check the browser console or the API logs if a new set doesn't appear.</p>
+      </div>
+    </section>
+
+    <!-- ============================================================
+         §8 — Alerts
+         ============================================================ -->
+    <section id="alerts">
+      <h2>Alerts <span class="chip best-effort">best-effort</span></h2>
+      <p>
+        Keyword patterns matched against post text. Each alert is one regex
+        and one delivery channel — browser notifications or a webhook POST.
+      </p>
+
+      <figure>
+        <div class="placeholder">Screenshot — alerts list with two active alerts, one inactive, create form visible with the webhook URL field shown.</div>
+        <figcaption>The webhook URL field only appears when "notify via" is set to <em>webhook</em>.</figcaption>
+      </figure>
+
+      <h3>Alert row</h3>
+      <ul>
+        <li><strong>Active toggle</strong> — switch-style, blue when on, grey when off. Click toggles immediately.</li>
+        <li><strong>Name</strong> — operator-chosen label.</li>
+        <li><strong>Pattern</strong> — shown in a monospace inline-code background. Supports regex; the placeholder hints at alternation (<code>elecciones|votación</code>).</li>
+        <li><strong>Notify via</strong> — <code>browser</code> or <code>webhook</code>.</li>
+        <li><strong>Event count</strong> — number of times this alert has fired since creation.</li>
+        <li><strong>Delete</strong> — trash icon, confirmed via <code>confirm()</code>.</li>
+      </ul>
+
+      <h3>Create form</h3>
+      <ul>
+        <li>Name (required), keyword pattern (required), notify via (browser or webhook), webhook URL (only when notify via = webhook, then required for delivery).</li>
+        <li>Help text under the pattern field: "supports regex".</li>
+      </ul>
+
+      <div class="callout warn">
+        <p><strong>Pattern errors are not validated client-side.</strong> An invalid regex is saved as-is; whether it ever matches depends on the worker's matcher. Test patterns on a few archived posts before relying on them.</p>
+      </div>
+    </section>
+
+    <!-- ============================================================
+         §9 — Timeline
+         ============================================================ -->
+    <section id="timeline">
+      <h2>Timeline</h2>
+      <p>
+        Chronological view of posts, grouped by post date. Useful for visual
+        scanning across sources. Always limited to the most recent 200 posts
+        that match the filters.
+      </p>
+
+      <figure>
+        <div class="placeholder">Screenshot — vertical timeline with two date groups, each containing a few cards indented from a grey rail on the left.</div>
+        <figcaption>Each card carries a small platform dot — colored per platform.</figcaption>
+      </figure>
+
+      <ul>
+        <li><strong>Filters</strong> (top row) — date from, date to, single platform select (all / twitter / instagram / facebook / tiktok / youtube). All apply on change; no submit button.</li>
+        <li><strong>Vertical rail</strong> — thin grey line on the left. Each date group is anchored by a small date badge on the rail.</li>
+        <li><strong>Card</strong> — platform color dot, platform name, <code>@username</code>, post time (HH:MM), optional "N media" count, and a 2-line text preview. Links to the post detail.</li>
+        <li><strong>Unknown date</strong> — posts with no <code>post_timestamp</code> are grouped under "Unknown date".</li>
+        <li><strong>Empty state</strong> — clock icon, "No posts to show / Adjust filters".</li>
+        <li><strong>Error state</strong> — renders the error message in red at the top of the content area.</li>
+      </ul>
+    </section>
+
+    <!-- ============================================================
+         §10 — Ingestion runs
+         ============================================================ -->
+    <section id="runs">
+      <h2>Ingestion runs</h2>
+      <p>
+        Every poll cycle is one row. Runs are recorded by the worker and
+        update in place as they progress. The page polls a static list — it
+        does <strong>not</strong> stream — so a long-running job will sit at
+        "running" until you press Refresh or reload.
+      </p>
+
+      <figure>
+        <div class="placeholder">Screenshot — runs table with one running, one completed, one partial, one failed; trigger-all button highlighted top right.</div>
+        <figcaption>Status colors map directly: pending grey, running blue, completed green, failed red, partial yellow.</figcaption>
+      </figure>
+
+      <h3>Columns</h3>
+      <ul>
+        <li><strong>Status</strong> — colored pill. <code>pending</code>, <code>running</code>, <code>completed</code>, <code>failed</code>, <code>partial</code>.</li>
+        <li><strong>Trigger</strong> — how this run was started (<code>scheduled</code>, <code>manual</code>, etc.).</li>
+        <li><strong>Found</strong> — total posts the run saw on the platform.</li>
+        <li><strong>New</strong> — posts that were not already in the archive and got inserted.</li>
+        <li><strong>Duration</strong> — <code>completed_at − started_at</code>, formatted as ms / s / m. "—" until both are set.</li>
+        <li><strong>Started</strong> — local datetime, or "—" if not started.</li>
+        <li><strong>Errors</strong> — red count when <code>errors[]</code> is non-empty, grey "—" otherwise. The error rows themselves are not surfaced on this page; they live in the <code>ingestion_runs.errors</code> JSONB column.</li>
+      </ul>
+
+      <h3>Affordances</h3>
+      <ul>
+        <li><strong>Refresh</strong> (icon button) — re-fetches the table.</li>
+        <li><strong>Trigger all</strong> — POSTs <code>/api/ingest/trigger</code> with an empty body; refetches after a 1-second delay. Disabled briefly while the request is in flight.</li>
+      </ul>
+    </section>
+
+    <!-- ============================================================
+         §11 — Audit log
+         ============================================================ -->
+    <section id="audit">
+      <h2>Audit log <span class="chip robust">robust</span></h2>
+      <p>
+        Append-only record of every meaningful event in the ingest pipeline:
+        a post being seen for the first time, a media file being downloaded,
+        an MHTML or screenshot being captured, content hashes being computed,
+        an ingestion run completing, and media download errors.
+      </p>
+
+      <figure>
+        <div class="placeholder">Screenshot — audit list filtered to "media_downloaded", showing colored badges, entity types, truncated IDs, and timestamps.</div>
+        <figcaption>Each badge color is fixed per event type — useful for spotting <em>media_download_error</em> at a glance.</figcaption>
+      </figure>
+
+      <ul>
+        <li><strong>Filter</strong> (top) — single select for event type, plus a total-event count text.</li>
+        <li><strong>Row</strong> — colored event-type pill, entity type (<code>post</code>, <code>media</code>, etc.), the first 8 chars of the entity UUID in monospace, then a local datetime, right-aligned.</li>
+        <li><strong>Pagination</strong> — 50 per page. Previous/Next appear only when total &gt; 50.</li>
+        <li><strong>Empty state</strong> — shield icon, "No audit events", with a hint.</li>
+      </ul>
+
+      <h3>Event types and colors</h3>
+      <ul>
+        <li><code>post_first_seen</code>, <code>ingestion_completed</code> — green.</li>
+        <li><code>media_downloaded</code> — blue.</li>
+        <li><code>mhtml_captured</code> — purple.</li>
+        <li><code>screenshot_captured</code> — indigo.</li>
+        <li><code>hashes_computed</code> — teal.</li>
+        <li><code>media_download_error</code> — red.</li>
+      </ul>
+
+      <p>Unknown event types fall back to grey. The page does not show the event's <code>details</code> JSON — query the API or the DB if you need the payload.</p>
+    </section>
+
+    <!-- ============================================================
+         §12 — Storage & retention
+         ============================================================ -->
+    <section id="storage">
+      <h2>Storage &amp; retention <span class="chip manual">manual</span></h2>
+      <p>
+        <code>/settings/storage</code>. Reads <code>/api/storage/stats</code>
+        and <code>/api/storage/retention-policies</code>. The disk numbers
+        come from <code>shutil.disk_usage</code> against the archive root, so
+        they reflect the whole mount, not just Social Monitor's footprint.
+      </p>
+
+      <figure>
+        <div class="placeholder">Screenshot — four overview tiles at top, two breakdown panels (by platform / by media type), then a retention policy list.</div>
+        <figcaption>The "Used" tile has the blue progress bar; everything else is plain text.</figcaption>
+      </figure>
+
+      <h3>Drive overview (four tiles)</h3>
+      <ul>
+        <li><strong>Drive total</strong> — total bytes of the mount.</li>
+        <li><strong>Used</strong> — used bytes plus a blue progress bar and a percentage line. Reflects everything on the disk, not just the archive.</li>
+        <li><strong>Free space</strong> — remaining bytes.</li>
+        <li><strong>Archive size</strong> — sum of media + capture bytes attributable to Social Monitor (<code>archive_bytes</code>).</li>
+      </ul>
+
+      <h3>Breakdowns</h3>
+      <ul>
+        <li><strong>By platform</strong> — bytes per platform (twitter, instagram, …). Platforms with no archived bytes are omitted.</li>
+        <li><strong>By media type</strong> — bytes per media type (image, video, …). Same omission rule.</li>
+      </ul>
+      <p>Both panels show "No data yet" when their map is empty.</p>
+
+      <h3>Retention policies</h3>
+      <ul>
+        <li><strong>Row</strong> — name, target type (<code>global</code> / <code>platform</code> / <code>source</code>), action (<code>delete_media</code> / <code>delete_all</code> / <code>compress</code>), and "N days" when <code>max_age_days</code> is set. Trash icon on the right deletes (with <code>confirm()</code>).</li>
+        <li><strong>Add policy</strong> — inline form: name, scope, max age days (optional), action.</li>
+      </ul>
+
+      <div class="callout warn">
+        <p><strong>Defining a policy is not the same as enforcing one.</strong> The UI lets you create and delete policies. Whether and how they fire is the worker's responsibility — check ingestion logs and the audit log to confirm the corresponding deletes/compressions actually ran. Treat policies as declarations, not guarantees, until you see the audit trail.</p>
+      </div>
+    </section>
+
+    <!-- ============================================================
+         §13 — Platform support matrix
+         ============================================================ -->
+    <section id="platform-matrix">
+      <h2>Platform support matrix</h2>
+      <p>
+        Five platforms are wired into the ingest pipeline through Apify. Each
+        has a normalizer under <code>backend/app/services/normalizers/</code>
+        that maps the Apify payload into the unified <code>Post</code> shape.
+      </p>
+      <p>
+        Note that <strong>platform "icons" in the UI are colored text labels</strong>,
+        not glyphs — <code>platformIcon("instagram")</code> returns the string
+        <code>"Instagram"</code>, which is rendered in pink. There are no
+        SVG brand icons.
+      </p>
+
+      <table class="matrix">
+        <thead>
+          <tr>
+            <th>Platform</th>
+            <th>Ingest</th>
+            <th>Capture path</th>
+            <th>What to double-check</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><span class="chip robust">robust</span><br>Twitter / X</td>
+            <td>Apify scraper → twitter normalizer</td>
+            <td>MHTML &amp; screenshot via Playwright; media via yt-dlp where applicable</td>
+            <td>Posts behind login gates may return empty <code>text_content</code>; check the <code>platform_data</code> dump on the detail page.</td>
+          </tr>
+          <tr>
+            <td><span class="chip robust">robust</span><br>Instagram</td>
+            <td>Apify scraper → instagram normalizer</td>
+            <td>MHTML &amp; screenshot; media via yt-dlp</td>
+            <td>Stories and reels return different payload shapes — see <code>docs/apify-output-schemas.md</code> for the field map.</td>
+          </tr>
+          <tr>
+            <td><span class="chip best-effort">best-effort</span><br>Facebook</td>
+            <td>Apify scraper → facebook normalizer</td>
+            <td>MHTML &amp; screenshot; media as available</td>
+            <td>Facebook surfaces vary a lot between page / group / profile; expect occasional missing engagement counts.</td>
+          </tr>
+          <tr>
+            <td><span class="chip robust">robust</span><br>TikTok</td>
+            <td>Apify scraper → tiktok normalizer</td>
+            <td>MHTML &amp; screenshot; video via yt-dlp on <code>worker-media</code></td>
+            <td>Very large videos may hit <code>MAX_VIDEO_FILESIZE</code> / <code>MAX_VIDEO_DURATION</code> / <code>MAX_VIDEO_RESOLUTION</code> caps and skip the media-download step.</td>
+          </tr>
+          <tr>
+            <td><span class="chip robust">robust</span><br>YouTube</td>
+            <td>Apify scraper → youtube normalizer</td>
+            <td>MHTML &amp; screenshot; video via yt-dlp on <code>worker-media</code></td>
+            <td>Same video caps apply. Live streams and unlisted videos are not guaranteed.</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p>
+        Adding a sixth platform means adding a normalizer under
+        <code>backend/app/services/normalizers/</code> and wiring it into
+        the ingest task — there is no UI to register a new platform string.
+      </p>
+    </section>
+
+    <!-- ============================================================
+         §14 — Reliability & background machinery
+         ============================================================ -->
+    <section id="reliability">
+      <h2>Reliability &amp; background machinery</h2>
+      <p>
+        These run quietly. List them so you can recognise the fingerprints
+        when something looks off.
+      </p>
+      <ul>
+        <li>
+          <strong>Three Celery queues, on purpose.</strong>
+          <code>worker-default</code> (concurrency 4) runs alerts, link
+          expansion, profile snapshots, retention, and hashing.
+          <code>worker-media</code> (concurrency 2) runs yt-dlp and ffmpeg.
+          <code>worker-capture</code> (concurrency 1) runs Playwright MHTML
+          and screenshot capture — single-concurrency so chromium instances
+          don't pile up.
+        </li>
+        <li>
+          <strong>DatabaseScheduler reads poll cadence from the DB.</strong>
+          The custom beat scheduler in <code>backend/app/worker/scheduler.py</code>
+          reads each source's <code>poll_interval</code> column. To change a
+          source's cadence, update the row through the Sources page — there
+          is no cron file to edit.
+        </li>
+        <li>
+          <strong>Health endpoint.</strong> <code>GET /health</code> on the API
+          returns <code>{status, checks: {database, storage}}</code>. The
+          storage check runs <code>shutil.disk_usage</code> against the
+          archive root and reports total / free GB plus used percent. Use it
+          to confirm both the DB connection and the archive mount.
+        </li>
+        <li>
+          <strong>Audit log as receipt.</strong> Every capture, download, and
+          hash computation writes a row. If you're not sure whether a job ran,
+          filter <code>/audit</code> on the matching event type rather than
+          guessing from the post-detail flags.
+        </li>
+        <li>
+          <strong>Review state lives in localStorage.</strong> The "NEW" badge
+          and the dashboard groups are computed against <code>localStorage</code>
+          in the browser, keyed by source. There is no server-side notion of
+          "reviewed." Different browsers / private windows / cleared storage
+          will see different review states.
+        </li>
+        <li>
+          <strong>File hashes for dedupe.</strong> <code>FileHash</code> rows
+          let the system recognise the same media across posts. Hash
+          computation is asynchronous; the <code>hashes_computed</code> flag on
+          a post becomes true only after the worker finishes.
+        </li>
+        <li>
+          <strong>CORS lockdown.</strong> The API allows requests only from
+          <code>http://localhost:3000</code>. Reaching the API from another
+          host requires editing <code>backend/app/main.py</code>.
+        </li>
+      </ul>
+    </section>
+
+    <!-- ============================================================
+         §15 — Known limitations
+         ============================================================ -->
+    <section id="limits">
+      <h2>Known limitations</h2>
+      <ul>
+        <li>
+          <strong>Review state is per-browser.</strong> Marking posts reviewed
+          in one browser does not propagate to another. Clearing site data
+          resets the queue.
+        </li>
+        <li>
+          <strong>Dashboard groups only the most recent 200 posts.</strong>
+          Older unreviewed posts exist in the archive but won't appear on
+          <code>/</code> — they're only reachable through filters on
+          <code>/posts</code>.
+        </li>
+        <li>
+          <strong>Shortcut overlay over-promises.</strong> The overlay shows
+          <kbd>t</kbd> (tag) and <kbd>n</kbd> (note) but neither is bound on
+          the posts page. They are wired in the overlay component for future
+          use, not active.
+        </li>
+        <li>
+          <strong>Topic-set creation fails silently.</strong> The create POST
+          has no error surfacing; a failed save just doesn't appear in the
+          grid. Same for the alerts create form on certain errors.
+        </li>
+        <li>
+          <strong>Runs page does not stream.</strong> Long-running runs sit at
+          <code>running</code> until you press Refresh. There is no SSE or
+          websocket — the page is request/response only.
+        </li>
+        <li>
+          <strong>Audit details JSON is not visible in the UI.</strong> The
+          row shows event type + entity type + first-8 UUID + timestamp, but
+          not the <code>details</code> JSONB payload. Query the API or DB
+          directly when you need the payload.
+        </li>
+        <li>
+          <strong>Retention policies declare, the worker enforces.</strong>
+          Creating a policy does not delete anything immediately. Watch the
+          audit log to confirm the enforcement job ran.
+        </li>
+        <li>
+          <strong>Disk full is silent in the UI.</strong> If the archive mount
+          fills, captures will start failing — the failures show up in the
+          audit log and the worker logs, not on the dashboard. Watch the
+          drive overview tile.
+        </li>
+        <li>
+          <strong>No tests.</strong> The repo has no test suite — verifying
+          changes means running against a real Apify token and watching the
+          audit log.
+        </li>
+      </ul>
+    </section>
+
+    <!-- ============================================================
+         §16 — Where the rules live
+         ============================================================ -->
+    <section id="rules">
+      <h2>Where the rules live</h2>
+      <p>The files and tables that actually drive runtime behaviour:</p>
+      <ul>
+        <li><code>.env</code> — every external-facing setting. Apify token, archive host path, Postgres credentials, Redis URL, media caps (<code>MAX_VIDEO_FILESIZE</code>, <code>MAX_VIDEO_DURATION</code>, <code>MAX_VIDEO_RESOLUTION</code>), poll defaults, per-service CPU and memory limits. See <code>.env.example</code> for the full list.</li>
+        <li><code>docker-compose.yml</code> — the seven services (db, redis, api, worker-default, worker-media, worker-capture, beat, web) and their resource limits. To change concurrency, edit the worker service entry.</li>
+        <li><code>backend/app/main.py</code> — FastAPI app + CORS list. The CORS origins are hard-coded to <code>http://localhost:3000</code>; widen before exposing the API.</li>
+        <li><code>backend/app/worker/scheduler.py</code> — the custom <code>DatabaseScheduler</code>. Reads poll intervals from the <code>sources</code> table; no cron file involved.</li>
+        <li><code>backend/app/worker/tasks/</code> — one module per task type (ingest, apify_fetch, capture, media_download, link_expansion, hashing, profile_snapshot, retention, alerts). Each is routed to the appropriate queue.</li>
+        <li><code>backend/app/services/normalizers/</code> — one normalizer per platform. Adding a platform = adding a normalizer here plus the platform string in the API and frontend.</li>
+        <li><code>backend/alembic/versions/001_initial_schema.py</code> — the single baseline migration. Schema changes go in new alembic revisions, not by editing the baseline.</li>
+        <li><code>docs/apify-output-schemas.md</code> — the platform-specific Apify response shapes the normalizers are written against.</li>
+        <li><code>sources</code> table — per-source poll cadence and active flag. Edit through the Sources page; the scheduler picks up changes on its next loop.</li>
+      </ul>
+
+      <p>
+        Restart impact: changes to <code>.env</code> or <code>docker-compose.yml</code>
+        need <code>make stop &amp;&amp; make start</code>. Schema changes need
+        <code>make migrate</code>. Source poll intervals are picked up live by
+        the next beat tick — no restart.
+      </p>
+    </section>
+
+    <footer class="end">
+      <span>Health check: <code>http://localhost:8000/health</code> · API on <code>:8000</code>, web on <code>:3000</code></span>
+      <span class="ornament">❦</span>
+    </footer>
+
+  </main>
+</div>
+
+<script>
+// Highlight the current section in the TOC.
+(function () {
+  const links = Array.from(document.querySelectorAll('nav.toc a[href^="#"]'));
+  const sections = links
+    .map(a => document.getElementById(a.getAttribute('href').slice(1)))
+    .filter(Boolean);
+  const setActive = (id) => {
+    links.forEach(a => a.classList.toggle('active',
+      a.getAttribute('href') === '#' + id));
+  };
+  const obs = new IntersectionObserver(entries => {
+    const visible = entries
+      .filter(e => e.isIntersecting)
+      .sort((a, b) => a.target.offsetTop - b.target.offsetTop);
+    if (visible.length) setActive(visible[0].target.id);
+  }, { rootMargin: '-40% 0px -55% 0px', threshold: 0 });
+  sections.forEach(s => obs.observe(s));
+})();
+</script>
+</body>
+</html>

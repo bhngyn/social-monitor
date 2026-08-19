@@ -100,3 +100,46 @@ App URLs:
 - Don't put browser-automation work on `worker-default`; Playwright belongs on `worker-capture` (concurrency 1) so chromium instances don't pile up.
 - `DatabaseScheduler` reads poll intervals from the `sources` table. To change a source's poll cadence, update the row — not a cron file.
 - CORS in `backend/app/main.py` is locked to `http://localhost:3000`; widen it before exposing the API remotely.
+
+## Distribution (external bundlers)
+
+This repo's own deliverable is `docker compose up` against the in-tree
+`docker-compose.yml` (which builds images from `./backend` and `./frontend`).
+It is **also** consumed by an external bundler that ships social_monitor to
+colleagues as part of a multi-app investigation toolkit.
+
+- **Release workflow**: `.github/workflows/release.yml` fires on a semver tag
+  push (`git tag vX.Y.Z && git push --tags`) or `workflow_dispatch`. Uses a
+  matrix to build both images in parallel for `linux/arm64`:
+  - `./backend` → `ghcr.io/bhngyn/social-monitor-api:vX.Y.Z` + `:latest`
+  - `./frontend` → `ghcr.io/bhngyn/social-monitor-web:vX.Y.Z` + `:latest`
+  Both share the same git tag — they're released as a pair.
+- **Consumer**: [Investigation Tool Bundle](../investigation-tool-bundle/). The
+  bundle does **not** ship this repo's source; it ships its own slimmed
+  `compose/social-monitor/docker-compose.yml` that:
+  - Uses `image:` references (no `build:` directives, no source bind-mounts).
+  - References both images with `${IMAGE_TAG:-latest}`, which the bundler
+    exports from its `manifest.json` pin.
+  - Bind-mounts a host directory for Postgres data (not a named volume) so
+    the colleague's archive survives `docker compose down -v`.
+  - Only exposes the `web` service to the host (port 3000); api, workers,
+    db, redis, beat all stay on the compose network.
+- **Env vars the bundler exports** (the compose file in the bundler references
+  them; this repo's compose file uses the same names so behaviour matches):
+  `IMAGE_TAG`, `ARCHIVE_HOST_PATH`, `POSTGRES_DATA_HOST_PATH`, `POSTGRES_USER`,
+  `POSTGRES_PASSWORD`, `POSTGRES_DB`, `APIFY_API_TOKEN`.
+- **Compatibility risks for the bundler**:
+  - Renaming services (`api`, `web`, `worker-default`, `worker-media`,
+    `worker-capture`, `beat`, `db`, `redis`) breaks the bundle's compose file.
+  - Splitting either image into more images (e.g. separating beat from
+    workers) means the matrix needs a new entry **and** the bundle's compose
+    file needs to reference the new image.
+  - Adding a new required env var on the api or workers means updating the
+    bundle's `apps.json` `docker_compose.env` block so the bundler exports it.
+  - The frontend's `Dockerfile` currently runs `npm run dev` (Next.js dev
+    server). If that changes to a production build, the bundle should still
+    work, but verify port 3000 still serves the UI.
+- **What the bundler does NOT carry over from this repo's compose file**:
+  source bind-mounts (`./backend:/app`, `./frontend/src:/app/src`), the
+  `develop.watch` block, `--reload` on uvicorn. Those are dev-only and stay
+  out of the colleague-facing distribution.

@@ -8,6 +8,12 @@
       "port": 3000
     },
     {
+      "name": "frontend-npm",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "frontend", "run", "dev"],
+      "port": 3000
+    },
+    {
       "name": "api",
       "runtimeExecutable": "docker",
       "runtimeArgs": ["compose", "up", "--build", "api", "db", "redis"],

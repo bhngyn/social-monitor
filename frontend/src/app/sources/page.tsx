@@ -30,11 +30,6 @@ const PLATFORMS = [
   "instagram",
   "youtube",
   "tiktok",
-  "reddit",
-  "linkedin",
-  "bluesky",
-  "mastodon",
-  "threads",
 ];
 
 interface SourceFormData {
