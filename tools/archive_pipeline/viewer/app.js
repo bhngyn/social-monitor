@@ -110,13 +110,15 @@
     const t = skel(term), max = term.length < 5 ? 0 : term.length < 8 ? 1 : 2, out = [];
     const tn = vocab.get(term)?.n || 0, real = tn >= 3;
     const stem = (a, b) => { let i = 0; while (i < a.length && a[i] === b[i]) i++; return i; };
+    const ENDINGS = new Set(["", "s", "es", "ed", "d", "ing", "er", "ers", "e", "ies", "ied", "ment", "ments"]);
     for (const [w, v] of vocab) {
       if (w === term || Math.abs(w.length - term.length) > max + 2) continue;
       const k = v.k ??= skel(w);
       if (k === t) { out.push([w, 0, v.n]); continue; }
       if (k[0] !== t[0]) continue;
       if (real) {
-        const inflect = Math.abs(w.length - term.length) <= 3 && stem(w, term) >= Math.max(4, Math.min(w.length, term.length) - 2);
+        const st = stem(w, term);
+        const inflect = st >= 4 && ENDINGS.has(w.slice(st)) && ENDINGS.has(term.slice(st));  // harvest ~ harvests/harvesting
         const rareTypo = v.n <= 2 && v.n * 10 <= tn && editDist(t, k, 1) <= 1;
         if (inflect || rareTypo) out.push([w, inflect ? 0.5 : 1, v.n]);
       } else {

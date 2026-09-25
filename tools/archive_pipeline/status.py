@@ -382,7 +382,8 @@ def heartbeats():
                     "item": h.get("item"), "index": h.get("index"), "total": h.get("total"), "detail": detail,
                     "elapsed_s": el, "progress": prog, "estimated": h.get("item_progress") is None and prog is not None,
                     "eta_s": (el / prog - el) if prog and el and prog > 0.02 else None,
-                    "log_age_s": silent, "stall_after_s": allowed, "phase": h.get("kind") or "working"})
+                    "log_age_s": silent, "stall_after_s": allowed,
+                    "phase": "paused" if h.get("paused") else (h.get("kind") or "working")})
     return out
 
 

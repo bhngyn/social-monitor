@@ -15,7 +15,7 @@ processed in 60-min chunks so an 8 GB Mac doesn't hold hours of PCM in memory.
 """
 import argparse, subprocess, tempfile, time
 from pathlib import Path
-from common import (CFG, ROOT, derived_dir, duration, follow, has_audio, heartbeat, iter_videos, log, now, write_json,
+from common import (CFG, ROOT, derived_dir, duration, follow, has_audio, heartbeat, iter_videos, log, now, wait_if_paused, write_json,
                     write_srt, youtube_caption_status)
 
 CHUNK = 3600
@@ -84,6 +84,7 @@ def main():
             print(f"  {s}: {p}")
         return
 
+    wait_if_paused("transcribe")  # before loading anything heavy
     import mlx_whisper
     import mlx.core as mx
     from importlib.metadata import version
@@ -97,6 +98,7 @@ def main():
         log(f"{len(todo)} videos to transcribe")
         failed = []
         for i, (src, p) in enumerate(todo, 1):
+            wait_if_paused("transcribe")
             t0 = time.time()
             dur = duration(p)
             rtf = speed["proc"] / speed["audio"] if speed["audio"] else None

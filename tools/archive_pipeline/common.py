@@ -192,3 +192,38 @@ def follow(build_todo, process, enabled: bool, idle_s: int = 300):
             return
         log(f"waiting for new downloads (rescan in {idle_s}s)")
         time.sleep(idle_s)
+
+
+# ---------------------------------------------------------------- processing pause (pause.py)
+
+PAUSE_FILE = LOGS / "processing.pause"
+
+
+def pause_state():
+    """(paused, until_epoch or None, note) from logs/processing.pause, if present and not expired."""
+    try:
+        d = json.loads(PAUSE_FILE.read_text())
+    except (OSError, ValueError):
+        return False, None, ""
+    until = d.get("until_ts")
+    if until is not None and time.time() >= until:
+        return False, until, d.get("note", "")
+    return True, until, d.get("note", "")
+
+
+def wait_if_paused(stage: str):
+    """Block while transcription/OCR are paused (checked before each file). Removing the pause
+    file or reaching its resume time lets work continue within a minute."""
+    announced = False
+    while True:
+        paused, until, note = pause_state()
+        if not paused:
+            if announced:
+                log("pause over, resuming")
+            return
+        when = datetime.fromtimestamp(until).astimezone().strftime("%Y-%m-%d %H:%M %Z") if until else "manual resume"
+        if not announced:
+            log(f"paused until {when}" + (f" ({note})" if note else ""))
+            announced = True
+        heartbeat(stage, item=None, detail=f"paused until {when}", paused=True)
+        time.sleep(60)

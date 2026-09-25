@@ -15,7 +15,7 @@ import argparse, re, subprocess, tempfile, time
 from pathlib import Path
 import numpy as np
 from PIL import Image
-from common import CFG, ROOT, derived_dir, follow, heartbeat, in_shard, iter_images, iter_videos, log, now, write_json
+from common import CFG, ROOT, derived_dir, follow, heartbeat, in_shard, iter_images, iter_videos, log, now, wait_if_paused, write_json
 
 LANGS = list(CFG["ocr"]["languages"])  # Apple Vision language codes, from the project config
 MIN_CONF = 0.3
@@ -101,6 +101,7 @@ def main():
         log(f"{sum(k == 'image' for k, *_ in todo)} images, {sum(k == 'video' for k, *_ in todo)} videos to OCR")
         failed = []
         for i, (kind, src, p) in enumerate(todo, 1):
+            wait_if_paused(stage)
             t0 = time.time()
             item = str(p.relative_to(ROOT))
             beat = lambda done, tot, detail: heartbeat(stage, item=item, kind=kind, index=i, total=len(todo), item_started=t0,
@@ -130,6 +131,7 @@ def main():
         todo = build_todo()
         log(f"{sum(k == 'image' for k, *_ in todo)} images, {sum(k == 'video' for k, *_ in todo)} videos to OCR")
         return
+    wait_if_paused(stage)
     follow(build_todo, process, a.follow)
     heartbeat(stage, item=None, detail="finished")
     log("done")
