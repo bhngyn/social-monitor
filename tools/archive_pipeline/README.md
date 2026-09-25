@@ -81,6 +81,18 @@ ARCHIVE_CONFIG=... .venv/bin/python status.py --watch 10 --html --quiet &   # ke
 **Alerts** fire for stalls, low disk, missing keep-awake, budget, and a live Apify run that
 nothing is polling.
 
+## Pausing transcription and OCR
+
+Downloads keep running; the heavy processing waits (e.g. to keep the machine free during the day):
+
+```bash
+ARCHIVE_CONFIG=... .venv/bin/python pause.py --until 00:00        # resume at the next local midnight
+ARCHIVE_CONFIG=... .venv/bin/python pause.py --indefinitely
+ARCHIVE_CONFIG=... .venv/bin/python pause.py --off                # resume now
+```
+
+Workers check before every file, wait without loading the Whisper model, and show "paused until …" in the monitor.
+
 ## Output layout (`archive_root`)
 
 ```
