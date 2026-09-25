@@ -137,17 +137,23 @@ def normalize_twitter(item: dict, source) -> dict | None:
 def _parse_timestamp(val) -> datetime | None:
     if not val:
         return None
-    try:
-        if isinstance(val, str):
-            # Try ISO 8601 first (Apify format)
-            if "T" in val:
-                return datetime.fromisoformat(val.replace("Z", "+00:00"))
-            # Try Twitter's format: "Fri Jun 28 18:57:07 +0000 2024"
+    if isinstance(val, str):
+        # ISO 8601 (Apify format). Do NOT sniff for "T" — Twitter's legacy
+        # format contains "Tue"/"Thu", which would take this branch and fail.
+        try:
+            return datetime.fromisoformat(val.replace("Z", "+00:00"))
+        except (ValueError, TypeError):
+            pass
+        # Twitter's legacy format: "Fri Jun 28 18:57:07 +0000 2024"
+        try:
             return datetime.strptime(val, "%a %b %d %H:%M:%S %z %Y")
-        if isinstance(val, (int, float)):
+        except (ValueError, TypeError):
+            return None
+    if isinstance(val, (int, float)):
+        try:
             return datetime.fromtimestamp(val, tz=timezone.utc)
-    except (ValueError, TypeError, OSError):
-        pass
+        except (ValueError, TypeError, OSError):
+            return None
     return None
 
 
