@@ -5,6 +5,8 @@ usage: ARCHIVE_CONFIG=project.toml python pause.py --until 00:00        # next l
        ARCHIVE_CONFIG=project.toml python pause.py --indefinitely
        ARCHIVE_CONFIG=project.toml python pause.py --off                # resume now
        ARCHIVE_CONFIG=project.toml python pause.py                      # show state
+       add --stage transcribe (or --stage ocr) to any of these to pause/resume just that stage
+
 
 transcribe.py and ocr.py check the pause before starting and before every file, so a
 pause set mid-run takes effect after the current file. Paused workers wait without loading
@@ -12,7 +14,7 @@ the Whisper model; run_all.sh's later passes honour the pause too.
 """
 import argparse, json, time
 from datetime import datetime, timedelta
-from common import PAUSE_FILE, pause_state, write_json
+from common import PAUSE_FILE, pause_state, stage_pause_file, write_json
 
 
 def parse_when(s: str) -> datetime:
@@ -36,20 +38,24 @@ def main():
     g.add_argument("--indefinitely", action="store_true")
     g.add_argument("--off", action="store_true", help="resume now")
     ap.add_argument("--note", default="")
+    ap.add_argument("--stage", choices=["transcribe", "ocr"], help="pause/resume only this stage")
     a = ap.parse_args()
+    path = stage_pause_file(a.stage) if a.stage else PAUSE_FILE
+    what = {"transcribe": "transcription", "ocr": "OCR", None: "transcription + OCR"}[a.stage]
     if a.off:
-        PAUSE_FILE.unlink(missing_ok=True)
-        print("processing resumed (workers pick it up within a minute)")
+        path.unlink(missing_ok=True)
+        print(f"{what} resumed (workers pick it up within a minute)")
         return
     if a.until or a.indefinitely:
         t = parse_when(a.until) if a.until else None
-        write_json(PAUSE_FILE, {"until_ts": t.timestamp() if t else None, "until": t.isoformat() if t else None,
+        write_json(path, {"until_ts": t.timestamp() if t else None, "until": t.isoformat() if t else None,
                                 "note": a.note, "set_at": datetime.now().astimezone().isoformat()})
-        print(f"transcription + OCR paused until {t.strftime('%Y-%m-%d %H:%M %Z') if t else 'you run pause.py --off'}")
+        print(f"{what} paused until {t.strftime('%Y-%m-%d %H:%M %Z') if t else 'you run pause.py ' + (f'--stage {a.stage} ' if a.stage else '') + '--off'}")
         return
-    paused, until, note = pause_state()
-    print("paused until " + (datetime.fromtimestamp(until).astimezone().strftime("%Y-%m-%d %H:%M %Z") if until else "manual resume")
-          + (f" ({note})" if note else "") if paused else "not paused")
+    for stage in ("transcribe", "ocr"):
+        paused, until, note = pause_state(stage)
+        print(f"{stage}: " + ("paused until " + (datetime.fromtimestamp(until).astimezone().strftime("%Y-%m-%d %H:%M %Z") if until else "manual resume")
+              + (f" ({note})" if note else "") if paused else "not paused"))
 
 
 if __name__ == "__main__":

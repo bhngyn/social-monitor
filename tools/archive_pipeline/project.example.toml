@@ -44,6 +44,7 @@ budget_usd = 0.0                              # cap for this run (≈ $0.0023/po
 [transcribe]
 model = "mlx-community/whisper-large-v3-turbo"
 youtube = "missing"                           # missing | all | none — FB/IG videos are always done
+temperatures = [0.0, 0.4, 0.8]                # decode retries when a window looks garbled; each rung is a full re-decode
 
 [ocr]
 languages = ["en-US"]                         # Apple Vision codes, e.g. "fr-FR", "es-ES", "ar-SA"

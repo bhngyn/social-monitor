@@ -12,14 +12,22 @@ Language is auto-detected, so speech is transcribed in the language spoken.
 Writes derived/<media path>/whisper.json (language, model, segments) + whisper.srt.
 Resumable: skips media whose whisper.json exists. Audio longer than 90 min is
 processed in 60-min chunks so an 8 GB Mac doesn't hold hours of PCM in memory.
+
+Speed: the next file's audio is decoded (ffmpeg, CPU) while the GPU transcribes the
+current one, and a garbled window is retried at [transcribe] temperatures (default
+0.0/0.4/0.8) rather than mlx-whisper's six rungs.
 """
 import argparse, subprocess, tempfile, time
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from common import (CFG, ROOT, derived_dir, duration, follow, has_audio, heartbeat, iter_videos, log, now, wait_if_paused, write_json,
-                    write_srt, youtube_caption_status)
+import numpy as np
+from common import (CFG, ROOT, derived_dir, follow, heartbeat, iter_videos, log, media_info, now, pause_state, wait_if_paused,
+                    write_json, write_srt, youtube_caption_status)
 
 CHUNK = 3600
 MAX_WHOLE = 5400
+PREFETCH_MAX = 1800  # decode the next file ahead only if it's short enough to hold in memory (30 min = 115 MB)
+TEMPERATURES = tuple(float(t) for t in CFG["transcribe"]["temperatures"])
 
 
 def targets(sources, all_youtube):
@@ -31,20 +39,34 @@ def targets(sources, all_youtube):
         yield src, p
 
 
+def load_audio(p: Path) -> np.ndarray:
+    """16 kHz mono float32, exactly as mlx_whisper.audio.load_audio, but as numpy so it can be
+    decoded on a helper thread (MLX arrays are only created on the main thread). 2 ffmpeg threads,
+    not all cores: this overlaps the GPU work and must stay inside the machine's core budget."""
+    r = subprocess.run(["ffmpeg", "-nostdin", "-i", str(p), "-threads", "2", "-f", "s16le", "-ac", "1",
+                        "-acodec", "pcm_s16le", "-ar", "16000", "-"], capture_output=True)
+    if r.returncode != 0:
+        raise RuntimeError(f"Failed to load audio: {r.stderr.decode(errors='replace')[-500:]}")
+    return np.frombuffer(r.stdout, np.int16).astype(np.float32) / 32768.0
+
+
 def transcribe_file(mlx_whisper, audio, model):
-    r = mlx_whisper.transcribe(str(audio), path_or_hf_repo=model, condition_on_previous_text=False,
-                               verbose=None)
+    if isinstance(audio, Path):
+        audio = str(audio)
+    r = mlx_whisper.transcribe(audio, path_or_hf_repo=model, condition_on_previous_text=False,
+                               temperature=TEMPERATURES, verbose=None)
     segs = [{"start": round(s["start"], 2), "end": round(s["end"], 2), "text": s["text"].strip()}
             for s in r.get("segments", []) if s.get("text", "").strip()]
     return r.get("language"), segs
 
 
-def transcribe(mlx_whisper, p: Path, model: str) -> dict:
-    dur = duration(p)
-    if not has_audio(p):
+def transcribe(mlx_whisper, p: Path, model: str, info: dict, audio=None) -> dict:
+    """info = media_info(p); audio = the file's decoded audio if it was prefetched."""
+    dur = info["duration"]
+    if not info["has_audio"]:
         return {"status": "no_audio", "duration": dur, "segments": []}
     if dur <= MAX_WHOLE:
-        lang, segs = transcribe_file(mlx_whisper, p, model)
+        lang, segs = transcribe_file(mlx_whisper, audio if audio is not None else p, model)
         return {"status": "ok", "duration": dur, "language": lang, "segments": segs}
     segs, langs = [], []
     with tempfile.TemporaryDirectory() as td:
@@ -93,19 +115,34 @@ def main():
     mx.set_cache_limit(256 * 1024 ** 2)
     tool = f"mlx-whisper {version('mlx-whisper')}"
     speed = {"audio": 0.0, "proc": 0.0}  # realtime factor shown by status.py
+    pool = ThreadPoolExecutor(1)
+
+    def prepare(p):
+        info = media_info(p)
+        audio = load_audio(p) if info["has_audio"] and 0 < info["duration"] <= PREFETCH_MAX else None
+        return info, audio
 
     def process(todo):
         log(f"{len(todo)} videos to transcribe")
         failed = []
+        ahead = {}  # index -> future of prepare(), for the next file only
         for i, (src, p) in enumerate(todo, 1):
             wait_if_paused("transcribe")
             t0 = time.time()
-            dur = duration(p)
+            try:
+                info, audio = (ahead.pop(i) if i in ahead else pool.submit(prepare, p)).result()
+            except Exception as e:
+                log(f"[{i}/{len(todo)}] ERROR {p}: {e!r}")
+                failed.append(p)
+                continue
+            if i < len(todo) and not pause_state("transcribe")[0]:
+                ahead[i + 1] = pool.submit(prepare, todo[i][1])  # decoded while the GPU works on this one
+            dur = info["duration"]
             rtf = speed["proc"] / speed["audio"] if speed["audio"] else None
             heartbeat("transcribe", item=str(p.relative_to(ROOT)), index=i, total=len(todo), item_started=t0,
                       audio_s=dur, expected_s=dur * rtf if rtf else None, detail=f"{dur / 60:.1f} min of audio")
             try:
-                r = transcribe(mlx_whisper, p, a.model)
+                r = transcribe(mlx_whisper, p, a.model, info, audio)
             except Exception as e:  # keep going; the item is retried next run
                 log(f"[{i}/{len(todo)}] ERROR {p}: {e!r}")
                 failed.append(p)
@@ -115,8 +152,9 @@ def main():
             out.mkdir(parents=True, exist_ok=True)
             write_srt(r["segments"], out / "whisper.srt")
             write_json(out / "whisper.json", r | {"source": src, "media": str(p), "model": a.model,
-                                                  "tool": tool, "created": now()})
+                                                  "temperatures": list(TEMPERATURES), "tool": tool, "created": now()})
             el = time.time() - t0
+            del audio
             mx.clear_cache()
             if r["status"] == "ok" and dur:
                 speed["audio"] += dur

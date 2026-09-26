@@ -79,6 +79,18 @@ def has_audio(p: Path) -> bool:
     return any(s.get("codec_type") == "audio" for s in ffprobe(p).get("streams", []))
 
 
+def media_info(p: Path) -> dict:
+    """duration, has_audio and video codec from a single ffprobe call."""
+    info = ffprobe(p)
+    streams = info.get("streams", [])
+    try:
+        dur = float(info["format"]["duration"])
+    except (KeyError, ValueError):
+        dur = 0.0
+    return {"duration": dur, "has_audio": any(s.get("codec_type") == "audio" for s in streams),
+            "vcodec": next((s.get("codec_name") for s in streams if s.get("codec_type") == "video"), None)}
+
+
 # ---------------------------------------------------------------- captions / SRT
 
 def srt_time(t: float) -> str:
@@ -196,13 +208,18 @@ def follow(build_todo, process, enabled: bool, idle_s: int = 300):
 
 # ---------------------------------------------------------------- processing pause (pause.py)
 
-PAUSE_FILE = LOGS / "processing.pause"
+PAUSE_FILE = LOGS / "processing.pause"  # pauses transcription and OCR together
 
 
-def pause_state():
-    """(paused, until_epoch or None, note) from logs/processing.pause, if present and not expired."""
+def stage_pause_file(stage: str):
+    """Pause for one stage only ("transcribe" or "ocr", shards included): logs/pause.<stage>.
+    Kept apart from PAUSE_FILE so workers that only know the shared pause aren't held by it."""
+    return LOGS / f"pause.{'ocr' if stage.startswith('ocr') else stage}"
+
+
+def _read_pause(path):
     try:
-        d = json.loads(PAUSE_FILE.read_text())
+        d = json.loads(path.read_text())
     except (OSError, ValueError):
         return False, None, ""
     until = d.get("until_ts")
@@ -211,12 +228,21 @@ def pause_state():
     return True, until, d.get("note", "")
 
 
+def pause_state(stage: str | None = None):
+    """(paused, until_epoch or None, note) from logs/processing.pause, or from the stage's own
+    pause file when a stage is given, if present and not expired."""
+    state = _read_pause(PAUSE_FILE)
+    if not state[0] and stage:
+        state = _read_pause(stage_pause_file(stage))
+    return state
+
+
 def wait_if_paused(stage: str):
     """Block while transcription/OCR are paused (checked before each file). Removing the pause
     file or reaching its resume time lets work continue within a minute."""
     announced = False
     while True:
-        paused, until, note = pause_state()
+        paused, until, note = pause_state(stage)
         if not paused:
             if announced:
                 log("pause over, resuming")

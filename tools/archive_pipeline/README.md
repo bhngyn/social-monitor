@@ -7,7 +7,7 @@ self-contained review kit. Reviewers open `OPEN ME.html` from a drive, with no s
 nothing to install.
 
 It runs on macOS with Apple silicon: transcription uses `mlx-whisper` on the GPU, and OCR
-uses Apple Vision through `ocrmac`.
+uses Apple Vision (the same request `ocrmac` makes, minus its PNG re-encode; `ocrmac` is the fallback).
 
 **Everything project-specific lives in a project folder outside this repository:**
 - target channels, pages and accounts;
@@ -89,6 +89,7 @@ Downloads keep running; the heavy processing waits (e.g. to keep the machine fre
 ARCHIVE_CONFIG=... .venv/bin/python pause.py --until 00:00        # resume at the next local midnight
 ARCHIVE_CONFIG=... .venv/bin/python pause.py --indefinitely
 ARCHIVE_CONFIG=... .venv/bin/python pause.py --off                # resume now
+ARCHIVE_CONFIG=... .venv/bin/python pause.py --stage transcribe --indefinitely   # hold one stage only (transcribe | ocr)
 ```
 
 Workers check before every file, wait without loading the Whisper model, and show "paused until …" in the monitor.
