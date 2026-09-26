@@ -237,9 +237,52 @@ def pause_state(stage: str | None = None):
     return state
 
 
+def _rss_gb(pid: int | None = None) -> float:
+    out = subprocess.run(["ps", "-o", "rss=", "-p", str(pid or os.getpid())], capture_output=True, text=True).stdout
+    return int(out.strip() or 0) / 2**20
+
+
+def _mem_free_pct() -> int | None:
+    """macOS's own 'memory free' percentage (what memory_pressure reports), or None if unavailable."""
+    try:
+        return int(subprocess.run(["sysctl", "-n", "kern.memorystatus_level"], capture_output=True, text=True).stdout)
+    except ValueError:
+        return None
+
+
+# hold all workers when macOS reports less than this % memory free, resume at mem_resume_pct
+MEM_HOLD_PCT, MEM_RESUME_PCT = int(CFG["processing"]["mem_hold_pct"]), int(CFG["processing"]["mem_resume_pct"])
+
+
+def memory_guard(stage: str):
+    """Keep a runaway worker from taking the whole Mac down (it did: 2026-09-26 kernel panic, 3 leaking
+    OCR workers at ~7.5 GB each on an 8 GB machine). Checked before each file:
+      1. this worker above its RSS cap ([ocr]/[transcribe] max_rss_gb) -> re-exec itself: same args,
+         same log, fresh memory; finished files are skipped on the way back in.
+      2. the Mac as a whole nearly out of memory ([processing] mem_hold_pct) -> hold until it recovers.
+         Set it below the healthy full-load level, or held workers (still holding their memory) never resume."""
+    cap = float(CFG["ocr" if stage.startswith("ocr") else stage]["max_rss_gb"])
+    rss = _rss_gb()
+    if rss > cap:
+        log(f"memory guard: RSS {rss:.1f} GB > {cap} GB cap, restarting this worker")
+        heartbeat(stage, item=None, detail=f"restarting (RSS {rss:.1f} GB > {cap} GB)")
+        import sys
+        sys.stdout.flush(); sys.stderr.flush()
+        os.execv(sys.executable, [sys.executable, *sys.argv])
+    free = _mem_free_pct()
+    if free is None or free >= MEM_HOLD_PCT:
+        return
+    log(f"memory guard: Mac has {free}% memory free, holding until {MEM_RESUME_PCT}%")
+    while (free := _mem_free_pct()) is not None and free < MEM_RESUME_PCT:
+        heartbeat(stage, item=None, detail=f"holding: {free}% memory free", paused=True)
+        time.sleep(30)
+    log(f"memory guard: {free if free is not None else '?'}% free, resuming")
+
+
 def wait_if_paused(stage: str):
     """Block while transcription/OCR are paused (checked before each file). Removing the pause
-    file or reaching its resume time lets work continue within a minute."""
+    file or reaching its resume time lets work continue within a minute. Also runs memory_guard."""
+    memory_guard(stage)
     announced = False
     while True:
         paused, until, note = pause_state(stage)

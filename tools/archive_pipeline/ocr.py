@@ -50,14 +50,18 @@ def ocr_image(img: Image.Image):
     """The same Vision request ocrmac makes, on the same (PIL-decoded) pixels, handed over as a raw
     bitmap instead of re-encoded as PNG: identical output, about half the time."""
     import objc, Quartz, Vision
+    from Foundation import NSData
     try:
         with objc.autorelease_pool():
             im = img if img.mode == "RGBA" else img.convert("RGBA")
             w, h = im.size
             data = im.tobytes()
+            # CFData-backed provider, NOT CGDataProviderCreateWithData(None, data, ...): with no release
+            # callback PyObjC pins the bytes forever, leaking one full RGBA frame (~3.7 MB at 1280x720) per
+            # call. That grew 3 workers to ~7.5 GB each and kernel-panicked the 8 GB Mac on 2026-09-26.
+            provider = Quartz.CGDataProviderCreateWithCFData(NSData.dataWithBytes_length_(data, len(data)))
             cg = Quartz.CGImageCreate(w, h, 8, 32, 4 * w, Quartz.CGColorSpaceCreateWithName(Quartz.kCGColorSpaceSRGB),
-                                      Quartz.kCGImageAlphaLast, Quartz.CGDataProviderCreateWithData(None, data, len(data), None),
-                                      None, False, Quartz.kCGRenderingIntentDefault)
+                                      Quartz.kCGImageAlphaLast, provider, None, False, Quartz.kCGRenderingIntentDefault)
             req = Vision.VNRecognizeTextRequest.alloc().init()
             req.setRecognitionLevel_(0)  # accurate
             req.setRecognitionLanguages_(LANGS)
@@ -117,14 +121,14 @@ def ocr_video(p: Path, interval: float, progress=None, extracted=None) -> dict:
             sampled += 1
             if progress and sampled % 10 == 0:
                 progress(sampled, len(pairs), f"frame {sampled}/{len(pairs)} at {t:.0f}s")
-            img = Image.open(f)
-            small = thumb(img)
-            if small.std() < 3:  # blank / black frame
-                continue
-            if last is not None and np.abs(small - last).mean() < DUP_DIFF:
-                continue
-            last = small
-            lines = ocr_image(img)
+            with Image.open(f) as img:
+                small = thumb(img)
+                if small.std() < 3:  # blank / black frame
+                    continue
+                if last is not None and np.abs(small - last).mean() < DUP_DIFF:
+                    continue
+                last = small
+                lines = ocr_image(img)
             if lines:
                 frames.append({"t": round(t, 2), "text": "\n".join(l["text"] for l in lines), "lines": lines})
     finally:
@@ -182,7 +186,8 @@ def main():
                 beat(0, 0, "photos")
             try:
                 if kind == "image":
-                    lines = ocr_image(Image.open(p))
+                    with Image.open(p) as img:
+                        lines = ocr_image(img)
                     r = {"kind": "image", "text": "\n".join(l["text"] for l in lines), "lines": lines}
                 else:
                     extracted = ahead.pop(i).result() if i in ahead else extract_frames(p, a.interval)
