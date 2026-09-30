@@ -52,6 +52,7 @@ Paid scraping only runs with `enabled = true`, and never beyond `total_budget_us
 | 4 | Final transcription and OCR pass | |
 | 5 | Search index, watchlist hits, CSV and SQLite exports, viewer | `build_index.py` |
 | 6 | Full package (manifest + methodology) and Lite zip (no video) | `package.py` |
+| — | One self-contained .html (viewer + all index data + overview + methodology), run by hand after 6 | `build_single_html.py` |
 
 **Resumable and idempotent.** Re-run `run_all.sh` after a crash, reboot or drive
 disconnect, and every stage skips finished work:
@@ -106,6 +107,8 @@ viewer/, OPEN ME.html            the review tool (search, watchlist hits, item v
 exports/                         items.csv, hits.csv, archive.sqlite (FTS5)
 logs/                            per-stage logs, status.json, heartbeats
 METHODOLOGY.md, MANIFEST.sha256  written by package.py
+<packages_dir>/<slug>_archive_single_<date>.html   build_single_html.py: search/places/tags/methodology in one file;
+                                 media load when it sits in the archive root, else items link to the original post
 ```
 
 ## Watchlist format
