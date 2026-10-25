@@ -53,6 +53,7 @@ Makefile                 # setup / start / stop / logs / migrate / seed / reset-
 setup.sh                 # interactive first-run installer
 .env.example             # all required env vars
 docs/apify-output-schemas.md  # platform-specific Apify response shapes
+tools/archive_pipeline/       # standalone, config-driven archive → searchable review kit (see its README)
 ```
 
 ## Getting started
@@ -93,6 +94,15 @@ App URLs:
 - Each Celery task lives in its own module under `app/worker/tasks/`; route to the right queue (default / media / capture) based on resource profile.
 - Frontend uses SWR (not React Query); the API client is `apiFetch<T>()` in `frontend/src/lib/api.ts`.
 - No tests currently in the repo.
+
+## Standalone archive pipeline (`tools/archive_pipeline/`)
+
+Separate from the web app: a resumable pipeline (yt-dlp, Apify, mlx-whisper, Apple Vision OCR) that archives
+YouTube / Instagram / Facebook accounts to a drive and builds an offline review kit (`OPEN ME.html`, exports,
+Full/Lite packages). Everything project-specific — targets, budgets, watchlist, wording — lives in a
+`project.toml` **outside git**; run with `run_all.sh --config <project.toml>`, monitor with `status.py --watch`.
+Never commit project configs, watchlists or research workspaces; exclude local ones in `.git/info/exclude`
+(not `.gitignore`, whose entries would themselves reveal names).
 
 ## Common gotchas
 
