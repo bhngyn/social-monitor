@@ -165,10 +165,15 @@ def gather():
 
     # youtube
     arch = ROOT / "youtube" / "archive.txt"
-    g["yt_downloaded"] = sum(1 for l in arch.read_text().splitlines() if l.strip()) if arch.exists() else 0
+    # archive.txt is yt-dlp's download archive: one line per download event, with duplicate lines, so count unique ids
+    ids = {l.split()[-1] for l in arch.read_text().splitlines() if l.strip()} if arch.exists() else set()
+    g["yt_downloaded"] = len(ids)
     st = json.loads((LOGS / "status.json").read_text()) if (LOGS / "status.json").exists() else {}
-    g["yt_expected"] = st.get("youtube", {}).get("expected")
+    # status.json's "expected" is the SUM of the per-tab sizes, so a video listed on several tabs is counted once per tab
+    g["yt_tab_listings"] = st.get("youtube", {}).get("expected")
     g["yt_tabs"] = st.get("youtube", {}).get("tabs", {})
+    if g["yt_tabs"]:
+        g["yt_tab_listings"] = sum(g["yt_tabs"].values())
     g["yt_caption_gaps"] = st.get("youtube", {}).get("missing_captions")
     mt = [p.stat().st_mtime for p in ROOT.glob("youtube/*/*/*.info.json")]
     g["yt_window"] = (datetime.fromtimestamp(min(mt), timezone.utc).isoformat(timespec="seconds"),
@@ -189,14 +194,17 @@ def gather():
     return g
 
 
-def sources_md():
-    """Section 1 source list, generated from the project config."""
+def sources_md(g=None):
+    """Section 1 source list, generated from the project config (and, for Facebook, the date range found in the index)."""
+    fb_acc = [a for a in (g or {}).get("accounts", []) if a["platform"] == "facebook"]
+    fb_first = min((a["first"] for a in fb_acc if a["first"]), default="")
+    fb_last = max((a["last"] for a in fb_acc if a["last"]), default="")
     yt, fb, ig = CFG["youtube"]["tabs"], CFG["facebook"]["pages"], CFG["instagram"]["accounts"]
     out = []
     if yt:
         out.append("- YouTube: " + ", ".join(f"`{u}`" for u in yt) + ".")
     for p in fb:
-        extra = f" (collection by this pipeline covers posts older than {p['older_than']})" if p.get("older_than") else ""
+        extra = f" ({fb_first} to {fb_last}, as returned by the scraper; see the datasets in §3)" if fb_first else ""
         out.append(f"- Facebook `{p['url']}`: page posts{extra}.")
     if ig:
         out.append("- Instagram " + ", ".join(f"`@{a}`" for a in ig) + ": all posts.")
@@ -213,6 +221,10 @@ def methodology(g, lite=False):
     def mc(plat, kind, status="ok"):
         return med.get(f"{plat}|{kind}|{status}", 0)
     failed = {k: v for k, v in med.items() if not k.endswith("|ok")}
+    n_vid, n_list = g["yt_downloaded"], g["yt_tab_listings"]
+    yt_count = (f"{n_vid:,} unique videos in the download archive"
+                + (f" (the channel tabs list {n_list:,} entries in total; a video can appear on more than one tab, "
+                   f"so {n_list - n_vid:,} entries are repeats)" if n_list and n_list > n_vid else ""))
     tabs = ", ".join(f"{k.split('youtube.com/')[-1]}: {v:,}" for k, v in g["yt_tabs"].items()) or "n/a"
     t = g["tools"]
     gz = g["watchlist"]
@@ -238,7 +250,7 @@ Generated {g['generated']} by the archive pipeline's `package.py`. {'This is the
 {' '.join(M['purpose'].split()) or 'This archive preserves public social-media output for review. A match in the index is a pointer for a human reviewer to check against the original media, **not** a finding.'}
 
 Sources:
-{sources_md()}
+{sources_md(g)}
 
 ## 2. What is in the package
 
@@ -253,8 +265,7 @@ Index: {m.get('items', 0):,} items, {m.get('segments', 0):,} searchable text pas
 
 **YouTube:** yt-dlp {t['yt-dlp']} downloaded each video with its metadata (`.info.json`), description, thumbnail
 and captions (uploaded and YouTube automatic; languages {capt}; converted to SRT). Video is capped at {res}p
-(shorter side), preferring H.264 + AAC. Downloaded {g['yt_downloaded']:,} of {g['yt_expected'] or '?':,} videos listed by
-YouTube ({tabs}). Collection window (metadata file times, UTC):
+(shorter side), preferring H.264 + AAC. Downloaded {yt_count}. Entries per tab: {tabs}. Collection window (metadata file times, UTC):
 {g['yt_window'][0] + ' → ' + g['yt_window'][1] if g['yt_window'] else 'n/a'}.
 
 **Instagram and Facebook metadata:** collected through the Apify platform. Each run's full output is kept unmodified in
@@ -296,7 +307,7 @@ in the dataset (same signed path; both URLs are recorded).
 
 ## 5. Known gaps and limitations
 
-- **Facebook coverage** starts at the earliest post in `raw/facebook*.json`; see the table in §2. Older posts were not collected.
+- **Facebook coverage** is the union of the `raw/facebook*.json` datasets (see §3), de-duplicated by post. It runs from the earliest post the scraper returned to the collection date (first/last dates in the table in §2). Whether the scraper reached the page's very first post cannot be checked from here.
 - **Instagram:** {g['ig_errors']} posts came back from the platform with an error (e.g. restricted), so only partial metadata and no media.{(chr(10) + '  ' + ig_cov + '.') if ig_cov else ''}
 - **Media downloads that failed** (by platform|kind|status): {', '.join(f'{k} {v}' for k, v in failed.items()) or 'none'}.
 - **YouTube captions:** {g['yt_caption_gaps'] if g['yt_caption_gaps'] is not None else '?'} videos were missing at least one caption track at packaging time

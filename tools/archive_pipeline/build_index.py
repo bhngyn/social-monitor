@@ -80,10 +80,28 @@ def ocr_frames(doc, stop):
 
 # ---------------------------------------------------------------- items
 
+OVERRUN_SLACK = 5  # seconds of tolerance before timed text counts as "past the video's end"
+
+
+def yt_is_collection(info: dict, folder: Path) -> bool:
+    """True if a yt-dlp .info.json describes a playlist/channel page rather than one video.
+    Primary signal is yt-dlp's own _type; fallbacks: entries/playlist_count with no duration,
+    or no duration and the id equals channel_id / the folder is NA_<id>."""
+    if info.get("_type") not in (None, "video", "url"):
+        return True
+    if info.get("duration"):
+        return False
+    if info.get("entries") is not None or info.get("playlist_count"):
+        return True
+    vid = info.get("id")
+    return bool(vid) and (vid == info.get("channel_id") or folder.name == f"NA_{vid}")
+
+
 class Builder:
     def __init__(self):
         self.items, self.segs = [], []
         self.video_ocr = []  # (item_idx, media_idx, doc) — cleaned once stoplines are known
+        self.cap_overrun = {}  # item_idx -> {caption lang: [cues past the end, latest cue start]}
 
     def add_item(self, rec):
         self.items.append(rec)
@@ -109,10 +127,15 @@ class Builder:
 
     # ---- YouTube
     def youtube(self):
-        n = 0
+        n = skipped = 0
         for d in sorted(ROOT.glob("youtube/*/*/")):
             info = read_json(next(d.glob("*.info.json"), Path("/nonexistent")))
             if not info:
+                continue
+            if yt_is_collection(info, d):
+                skipped += 1
+                log(f"youtube: skipped playlist/channel page (not a video): {info.get('id')} "
+                    f"{info.get('title')!r} [{d.relative_to(ROOT)}]")
                 continue
             vid = info["id"]
             video = next((p for p in d.glob(f"{vid}.mp4")), None)
@@ -139,6 +162,10 @@ class Builder:
             for l in langs:
                 for s in windows(parse_srt(d / f"{vid}.{l}.srt")):
                     self.seg(ii, 0, "caption", s["start"], s["text"])
+                    if item["dur"] and s["start"] > item["dur"] + OVERRUN_SLACK:
+                        o = self.cap_overrun.setdefault(ii, {}).setdefault(l, [0, 0.0])
+                        o[0] += 1
+                        o[1] = max(o[1], s["start"])
             if video:
                 item["m"][0] |= self.derived_for(ii, 0, video)
             if thumb:
@@ -146,7 +173,7 @@ class Builder:
                 if o:
                     self.seg(ii, None, "photo", None, o["text"].replace("\n", " / "))
             n += 1
-        log(f"youtube: {n} items")
+        log(f"youtube: {n} items" + (f" ({skipped} playlist/channel pages skipped)" if skipped else ""))
 
     # ---- Facebook
     def facebook(self):
@@ -223,6 +250,30 @@ class Builder:
             for c in p.get("latestComments") or []:
                 self.seg(ii, None, "comment", None, c.get("text"))
         log(f"instagram: {len(posts)} items")
+
+    def flag_timing_overruns(self):
+        """Evidentiary flag, never a drop: set item["warn"] on YouTube items with timed text
+        (caption / speech / onscreen) starting later than the video's own duration + OVERRUN_SLACK.
+        The text stays searchable; the viewer should show warn like it shows err."""
+        over = {}
+        for ii, mi, field, t, _ in self.segs:
+            it = self.items[ii]
+            if t is not None and it["p"] == "youtube" and it.get("dur") and t > it["dur"] + OVERRUN_SLACK:
+                o = over.setdefault(ii, {}).setdefault(field, [0, 0.0])
+                o[0] += 1
+                o[1] = max(o[1], t)
+        for ii, fields in over.items():
+            it = self.items[ii]
+            parts = [f"{n} {f} entr{'y' if n == 1 else 'ies'} (latest at {int(mx // 60)}:{int(mx % 60):02d})"
+                     for f, (n, mx) in sorted(fields.items())]
+            langs = sorted(self.cap_overrun.get(ii, {}))
+            via = f" (caption track{'s' if len(langs) > 1 else ''}: {', '.join(langs)})" if langs else ""
+            dm = int(it["dur"])
+            it["warn"] = (f"Timestamps run past the video's end ({dm // 60}:{dm % 60:02d}): " + "; ".join(parts) + via
+                          + ". These captions likely come from a different or time-shifted version of the video, "
+                          "so their seek times may not match this video. Text kept as published.")
+        log(f"youtube: {len(over)} item(s) with timed text past the video's end: "
+            + ", ".join(self.items[i]["i"] for i in over))
 
     def finish_ocr(self):
         stop = ocr_stoplines([o for *_, o in self.video_ocr])
@@ -395,6 +446,7 @@ def main():
     b.facebook()
     b.instagram()
     b.finish_ocr()
+    b.flag_timing_overruns()
     hits = find_hits(b.segs, gaz, b.items)
     counts = Counter(h["place"] for h in hits)
     item_counts = {pid: len({h["item"] for h in hits if h["place"] == pid}) for pid in counts}
