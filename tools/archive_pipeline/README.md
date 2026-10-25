@@ -7,7 +7,7 @@ self-contained review kit. Reviewers open `OPEN ME.html` from a drive, with no s
 nothing to install.
 
 It runs on macOS with Apple silicon: transcription uses `mlx-whisper` on the GPU, and OCR
-uses Apple Vision through `ocrmac`.
+uses Apple Vision (the same request `ocrmac` makes, minus its PNG re-encode; `ocrmac` is the fallback).
 
 **Everything project-specific lives in a project folder outside this repository:**
 - target channels, pages and accounts;
@@ -52,6 +52,7 @@ Paid scraping only runs with `enabled = true`, and never beyond `total_budget_us
 | 4 | Final transcription and OCR pass | |
 | 5 | Search index, watchlist hits, CSV and SQLite exports, viewer | `build_index.py` |
 | 6 | Full package (manifest + methodology) and Lite zip (no video) | `package.py` |
+| — | One self-contained .html (viewer + all index data + overview + methodology), run by hand after 6 | `build_single_html.py` |
 
 **Resumable and idempotent.** Re-run `run_all.sh` after a crash, reboot or drive
 disconnect, and every stage skips finished work:
@@ -89,6 +90,7 @@ Downloads keep running; the heavy processing waits (e.g. to keep the machine fre
 ARCHIVE_CONFIG=... .venv/bin/python pause.py --until 00:00        # resume at the next local midnight
 ARCHIVE_CONFIG=... .venv/bin/python pause.py --indefinitely
 ARCHIVE_CONFIG=... .venv/bin/python pause.py --off                # resume now
+ARCHIVE_CONFIG=... .venv/bin/python pause.py --stage transcribe --indefinitely   # hold one stage only (transcribe | ocr)
 ```
 
 Workers check before every file, wait without loading the Whisper model, and show "paused until …" in the monitor.
@@ -105,6 +107,8 @@ viewer/, OPEN ME.html            the review tool (search, watchlist hits, item v
 exports/                         items.csv, hits.csv, archive.sqlite (FTS5)
 logs/                            per-stage logs, status.json, heartbeats
 METHODOLOGY.md, MANIFEST.sha256  written by package.py
+<packages_dir>/<slug>_archive_single_<date>.html   build_single_html.py: search/places/tags/methodology in one file;
+                                 media load when it sits in the archive root, else items link to the original post
 ```
 
 ## Watchlist format

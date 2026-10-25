@@ -44,11 +44,18 @@ budget_usd = 0.0                              # cap for this run (≈ $0.0023/po
 [transcribe]
 model = "mlx-community/whisper-large-v3-turbo"
 youtube = "missing"                           # missing | all | none — FB/IG videos are always done
+temperatures = [0.0, 0.4, 0.8]                # decode retries when a window looks garbled; each rung is a full re-decode
+max_rss_gb = 5.0                              # worker restarts itself above this (model + audio is ~2.3 GB)
 
 [ocr]
 languages = ["en-US"]                         # Apple Vision codes, e.g. "fr-FR", "es-ES", "ar-SA"
 interval_s = 5.0                              # at most one keyframe per N seconds
 workers = 1                                   # parallel OCR processes (each ≈ 1 core)
+max_rss_gb = 1.5                              # each worker restarts itself above this (normal is well under 0.5 GB)
+
+[processing]
+mem_hold_pct = 5                              # transcription + OCR hold while macOS reports < this % memory free…
+mem_resume_pct = 10                           # …and resume at this; keep both below the healthy full-load level
 
 [watchlist]                                   # names to flag (places, organisations, people…)
 path = ""                                     # JSON list — see README "Watchlist format"; "" = off

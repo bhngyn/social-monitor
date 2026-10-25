@@ -16,11 +16,15 @@ mkdir -p "$OUT" "$ROOT/logs"
 URLS=()
 if [ $# -gt 0 ]; then URLS=("$@"); else while IFS= read -r u; do [ -n "$u" ] && URLS+=("$u"); done < <(cfg youtube.tabs); fi
 [ ${#URLS[@]} -gt 0 ] || { echo "no YouTube tabs configured"; exit 0; }
+# YT_REVERSE=1 walks each tab bottom-up. run_all.sh sets it for the second worker so the two meet in
+# the middle of a shared tab; walking the same direction they'd fetch each video in lockstep, both
+# writing the same file (archive.txt only records a video once it's finished) and corrupting it.
+ORDER=""; [ "${YT_REVERSE:-0}" = 1 ] && ORDER="--playlist-reverse"
 
 for u in "${URLS[@]}"; do
   echo "=== $u  $(date -u +%FT%TZ)"
   # -S res:N caps the *shorter* side, so vertical shorts get e.g. 720x1280 rather than 360p
-  "$YTDLP" "$u" \
+  "$YTDLP" "$u" $ORDER \
     --ignore-errors --no-overwrites --no-progress \
     --download-archive "$OUT/archive.txt" \
     -f "bv*+ba/b" -S "res:$RES,vcodec:h264,acodec:m4a" \

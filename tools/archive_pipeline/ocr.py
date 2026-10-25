@@ -8,65 +8,132 @@ Videos: ffmpeg decodes keyframes only (-skip_frame nokey, far cheaper than a ful
 decode) and keeps one at least every --interval seconds; near-duplicate frames
 (32x18 grayscale mean diff < 4) and blank frames are skipped before OCR.
 Timestamps are the keyframe's real pts, so seek-to-time in the viewer is exact.
+VP9 ignores -skip_frame nokey (every frame gets decoded), so VP9 is decoded on the
+Apple media engine (VideoToolbox) instead of the CPU. The next video's frames are
+extracted while the current one is OCR'd.
+
+Text is read by Apple Vision (VNRecognizeTextRequest, accurate); bbox = Vision's normalised
+[x, y, w, h], origin bottom-left. Same request and pixels as ocrmac (output is identical),
+minus its PNG re-encode; ocrmac itself remains the fallback.
 
 Writes derived/<media path>/ocr.json. Resumable: skips media whose ocr.json exists.
 """
 import argparse, re, subprocess, tempfile, time
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 import numpy as np
 from PIL import Image
-from common import CFG, ROOT, derived_dir, follow, heartbeat, in_shard, iter_images, iter_videos, log, now, wait_if_paused, write_json
+from common import (CFG, ROOT, derived_dir, follow, heartbeat, in_shard, iter_images, iter_videos, log, media_info, now,
+                    pause_state, wait_if_paused, write_json)
 
 LANGS = list(CFG["ocr"]["languages"])  # Apple Vision language codes, from the project config
 MIN_CONF = 0.3
 DUP_DIFF = 4.0
 FF_THREADS = 1  # per worker; parallelism comes from --shard workers
+HW_DECODE = {"vp9"}  # codecs where keyframe-only decode doesn't work, so decode on the media engine
+
+
+_fallback_logged = []
+
+
+def _lines(res):
+    return [{"text": t.strip(), "conf": round(float(c), 3), "bbox": [round(v, 4) for v in b]}
+            for t, c, b in res if t.strip() and c >= MIN_CONF]
+
+
+def _ocrmac(img: Image.Image):
+    from ocrmac import ocrmac
+    return _lines(ocrmac.OCR(img, recognition_level="accurate", language_preference=LANGS, unit="line").recognize())
 
 
 def ocr_image(img: Image.Image):
-    from ocrmac import ocrmac
-    res = ocrmac.OCR(img, recognition_level="accurate", language_preference=LANGS,
-                     unit="line").recognize()
-    lines = [{"text": t.strip(), "conf": round(float(c), 3), "bbox": [round(v, 4) for v in b]}
-             for t, c, b in res if t.strip() and c >= MIN_CONF]
-    return lines
+    """The same Vision request ocrmac makes, on the same (PIL-decoded) pixels, handed over as a raw
+    bitmap instead of re-encoded as PNG: identical output, about half the time."""
+    import objc, Quartz, Vision
+    from Foundation import NSData
+    try:
+        with objc.autorelease_pool():
+            im = img if img.mode == "RGBA" else img.convert("RGBA")
+            w, h = im.size
+            data = im.tobytes()
+            # CFData-backed provider, NOT CGDataProviderCreateWithData(None, data, ...): with no release
+            # callback PyObjC pins the bytes forever, leaking one full RGBA frame (~3.7 MB at 1280x720) per
+            # call. That grew 3 workers to ~7.5 GB each and kernel-panicked the 8 GB Mac on 2026-09-26.
+            provider = Quartz.CGDataProviderCreateWithCFData(NSData.dataWithBytes_length_(data, len(data)))
+            cg = Quartz.CGImageCreate(w, h, 8, 32, 4 * w, Quartz.CGColorSpaceCreateWithName(Quartz.kCGColorSpaceSRGB),
+                                      Quartz.kCGImageAlphaLast, provider, None, False, Quartz.kCGRenderingIntentDefault)
+            req = Vision.VNRecognizeTextRequest.alloc().init()
+            req.setRecognitionLevel_(0)  # accurate
+            req.setRecognitionLanguages_(LANGS)
+            ret = Vision.VNImageRequestHandler.alloc().initWithCGImage_options_(cg, None).performRequests_error_([req], None)
+            ok, err = ret if isinstance(ret, tuple) else (bool(ret), None)
+            if not ok or err is not None:
+                raise RuntimeError(err)
+            res = []
+            for o in req.results() or []:
+                b = o.boundingBox()
+                res.append((o.topCandidates_(1)[0].string(), o.confidence(),
+                            [b.origin.x, b.origin.y, b.size.width, b.size.height]))
+            return _lines(res)
+    except Exception as e:
+        if not _fallback_logged:
+            _fallback_logged.append(e)
+            log(f"direct Vision call failed ({e!r}); using ocrmac for this and any further failures")
+        return _ocrmac(img)
 
 
 def thumb(img: Image.Image) -> np.ndarray:
     return np.asarray(img.convert("L").resize((32, 18), Image.BILINEAR), dtype=np.float32)
 
 
-def ocr_video(p: Path, interval: float, progress=None) -> dict:
-    frames, sampled = [], 0
-    with tempfile.TemporaryDirectory() as td:
-        vf = (f"select='isnan(prev_selected_t)+gte(t-prev_selected_t\\,{interval - 0.5})',"
-              "scale='min(1280\\,iw)':-2,showinfo")
-        r = subprocess.run(["ffmpeg", "-hide_banner", "-nostats", "-threads", str(FF_THREADS), "-skip_frame", "nokey",
+def extract_frames(p: Path, interval: float):
+    """-> (TemporaryDirectory, [(jpg, pts)], decoder). The caller cleans up the directory."""
+    vf = (f"select='isnan(prev_selected_t)+gte(t-prev_selected_t\\,{interval - 0.5})',"
+          "scale='min(1280\\,iw)':-2,showinfo")
+    hw = media_info(p)["vcodec"] in HW_DECODE
+    td = tempfile.TemporaryDirectory()
+    for accel in ((["-hwaccel", "videotoolbox"], []) if hw else ([],)):
+        for f in Path(td.name).glob("f_*.jpg"):
+            f.unlink()
+        r = subprocess.run(["ffmpeg", "-hide_banner", "-nostats", "-threads", str(FF_THREADS), *accel, "-skip_frame", "nokey",
                             "-i", str(p), "-filter_threads", "1", "-vf", vf, "-fps_mode", "vfr", "-q:v", "3",
-                            f"{td}/f_%06d.jpg"],
+                            f"{td.name}/f_%06d.jpg"],
                            capture_output=True, text=True)
-        pts = [float(x) for x in re.findall(r"\bn:\s*\d+.*?pts_time:([\d.]+)", r.stderr)]
-        files = sorted(Path(td).glob("f_*.jpg"))
-        if r.returncode != 0 and not files:
-            raise RuntimeError(r.stderr[-500:])
+        files = sorted(Path(td.name).glob("f_*.jpg"))
+        if r.returncode == 0 or files:
+            break
+    else:
+        td.cleanup()
+        raise RuntimeError(r.stderr[-500:])
+    pts = [float(x) for x in re.findall(r"\bn:\s*\d+.*?pts_time:([\d.]+)", r.stderr)]
+    return td, list(zip(files, pts)), "videotoolbox" if accel else "cpu"
+
+
+def ocr_video(p: Path, interval: float, progress=None, extracted=None) -> dict:
+    """extracted = extract_frames(p, interval) if it was already run ahead of time."""
+    td, pairs, decoder = extracted or extract_frames(p, interval)
+    frames, sampled = [], 0
+    try:
         last = None
         if progress:
-            progress(0, len(files), "frames extracted")
-        for f, t in zip(files, pts):
+            progress(0, len(pairs), "frames extracted")
+        for f, t in pairs:
             sampled += 1
             if progress and sampled % 10 == 0:
-                progress(sampled, len(files), f"frame {sampled}/{len(files)} at {t:.0f}s")
-            img = Image.open(f)
-            small = thumb(img)
-            if small.std() < 3:  # blank / black frame
-                continue
-            if last is not None and np.abs(small - last).mean() < DUP_DIFF:
-                continue
-            last = small
-            lines = ocr_image(img)
+                progress(sampled, len(pairs), f"frame {sampled}/{len(pairs)} at {t:.0f}s")
+            with Image.open(f) as img:
+                small = thumb(img)
+                if small.std() < 3:  # blank / black frame
+                    continue
+                if last is not None and np.abs(small - last).mean() < DUP_DIFF:
+                    continue
+                last = small
+                lines = ocr_image(img)
             if lines:
                 frames.append({"t": round(t, 2), "text": "\n".join(l["text"] for l in lines), "lines": lines})
-    return {"kind": "video", "interval": interval, "frames_sampled": sampled, "frames": frames}
+    finally:
+        td.cleanup()
+    return {"kind": "video", "interval": interval, "decoder": decoder, "frames_sampled": sampled, "frames": frames}
 
 
 def main():
@@ -94,12 +161,19 @@ def main():
                      if in_shard(p, a.shard) and not (derived_dir(p) / "ocr.json").exists()]
         return todo[: a.limit] if a.limit else todo
 
-    from importlib.metadata import version
-    tool = f"Apple Vision via ocrmac {version('ocrmac')} (accurate, {'+'.join(LANGS)})"
+    import platform
+    tool = f"Apple Vision VNRecognizeTextRequest (accurate, {'+'.join(LANGS)}; ocrmac-equivalent), macOS {platform.mac_ver()[0]}"
+    pool = ThreadPoolExecutor(1)
 
     def process(todo):
         log(f"{sum(k == 'image' for k, *_ in todo)} images, {sum(k == 'video' for k, *_ in todo)} videos to OCR")
         failed = []
+        ahead = {}  # index -> future of extract_frames(), for the next video only
+
+        def prefetch(j):
+            if j <= len(todo) and todo[j - 1][0] == "video" and j not in ahead and not pause_state(stage)[0]:
+                ahead[j] = pool.submit(extract_frames, todo[j - 1][2], a.interval)
+
         for i, (kind, src, p) in enumerate(todo, 1):
             wait_if_paused(stage)
             t0 = time.time()
@@ -112,10 +186,13 @@ def main():
                 beat(0, 0, "photos")
             try:
                 if kind == "image":
-                    lines = ocr_image(Image.open(p))
+                    with Image.open(p) as img:
+                        lines = ocr_image(img)
                     r = {"kind": "image", "text": "\n".join(l["text"] for l in lines), "lines": lines}
                 else:
-                    r = ocr_video(p, a.interval, progress=beat)
+                    extracted = ahead.pop(i).result() if i in ahead else extract_frames(p, a.interval)
+                    prefetch(i + 1)  # next video's frames decode while this one is read
+                    r = ocr_video(p, a.interval, progress=beat, extracted=extracted)
             except Exception as e:
                 log(f"[{i}/{len(todo)}] ERROR {p}: {e!r}")
                 failed.append(p)

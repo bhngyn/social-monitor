@@ -14,7 +14,7 @@
 #
 # usage:  nohup ./run_all.sh --config /path/to/project.toml >/dev/null 2>&1 &
 #         (or export ARCHIVE_CONFIG). Log: <archive_root>/logs/run_all.log. Keeps the Mac awake.
-# env:    OCR_WORKERS (default [ocr] workers)   SKIP_PACKAGE=1   SKIP_APIFY=1
+# env:    OCR_WORKERS (default [ocr] workers)   SKIP_PACKAGE=1   SKIP_APIFY=1   SKIP_CAPTIONS=1
 # One project at a time per machine: stages are recognised by script name.
 set -u
 HERE="$(cd "$(dirname "$0")" && pwd)"
@@ -82,10 +82,10 @@ if running 'fetch_youtube\.sh'; then
 elif [ ${#TABS[@]} -gt 0 ]; then
   say "start YouTube workers"
   nohup ./fetch_youtube.sh "${TABS[@]}" >> "$LOGS/youtube_a.log" 2>&1 &
-  if [ ${#TABS[@]} -gt 1 ]; then  # second worker walks the tabs in reverse; they share archive.txt
+  if [ ${#TABS[@]} -gt 1 ]; then  # second worker walks the tabs, and each tab's items, in reverse
     REV=(); for ((j=${#TABS[@]}-1; j>=0; j--)); do REV+=("${TABS[j]}"); done
     sleep 30
-    nohup ./fetch_youtube.sh "${REV[@]}" >> "$LOGS/youtube_b.log" 2>&1 &
+    YT_REVERSE=1 nohup ./fetch_youtube.sh "${REV[@]}" >> "$LOGS/youtube_b.log" 2>&1 &
   fi
 fi
 ensure 'fetch_media\.py' media.log "$PY" fetch_media.py --platform all
@@ -110,15 +110,26 @@ say "retry pass: media"
 "$PY" fetch_media.py --platform all >> "$LOGS/media.log" 2>&1
 
 # ---- 3. caption backfill
-say "caption backfill"
-"$PY" backfill_captions.py >> "$LOGS/captions.log" 2>&1
+if [ "${SKIP_CAPTIONS:-0}" = 1 ]; then
+  say "SKIP_CAPTIONS=1, skipping caption backfill"
+else
+  say "caption backfill"
+  "$PY" backfill_captions.py >> "$LOGS/captions.log" 2>&1
+fi
 
 # ---- 4. final processing pass (followers exit once downloads stop and their queue is empty)
+# OCR and transcription run side by side, OCR sharded like stage 1, so a paused stage
+# (pause.py --stage ...) holds only itself and the other still finishes.
 wait_for 'transcribe\.py|ocr\.py'
-say "final transcription pass"
-nice -n 10 "$PY" transcribe.py >> "$LOGS/transcribe.log" 2>&1
-say "final OCR pass"
-nice -n 10 "$PY" ocr.py >> "$LOGS/ocr.log" 2>&1
+say "final transcription + OCR pass ($OCR_WORKERS OCR worker(s))"
+PIDS=()
+nice -n 10 "$PY" transcribe.py >> "$LOGS/transcribe.log" 2>&1 & PIDS+=($!)
+if [ "$OCR_WORKERS" -gt 1 ]; then
+  for ((i=0; i<OCR_WORKERS; i++)); do nice -n 10 "$PY" ocr.py --shard "$i/$OCR_WORKERS" >> "$LOGS/ocr_$i.log" 2>&1 & PIDS+=($!); done
+else
+  nice -n 10 "$PY" ocr.py >> "$LOGS/ocr.log" 2>&1 & PIDS+=($!)
+fi
+wait "${PIDS[@]}"  # not a bare wait: caffeinate is a child too, and it only exits with this script
 
 # ---- 5. index
 say "build index"

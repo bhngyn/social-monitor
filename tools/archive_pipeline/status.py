@@ -27,7 +27,7 @@ PROCS = {  # label: command-line regex
     "Packaging": r"package\.py",
     "FB history continuation": r"(fb_)?history_continue\.py",
     "YouTube download": r"fetch_youtube\.sh",
-    "yt-dlp": r"/yt-dlp ",
+    "yt-dlp": r"\.venv/bin/yt-dlp(\s|$)",  # the toolkit's own yt-dlp, not any command line mentioning one
     "IG/FB media": r"fetch_media\.py",
     "Apify run": r"fetch_apify\.py",
     "Caption backfill": r"backfill_captions\.py",
@@ -41,7 +41,7 @@ LOG_FOR = {"Pipeline (run_all)": ["run_all.log"],
            "IG/FB media": ["fb_videos.log", "ig.log", "fb_history.log", "media.log"],
            "Apify run": ["fb_history.log", "ig.log"],
            "Caption backfill": ["captions.log"], "Transcription": ["transcribe.log"],
-           "OCR": ["ocr_0.log", "ocr_1.log", "ocr_2.log", "ocr.log"],
+           "OCR": ["ocr.log"],  # + one ocr_<i>.log per shard, found by ocr_logs()
            "Index build": ["index.log"], "Packaging": ["package.log"],
            "FB history continuation": ["fb_continue.log", "fb_history2.log"]}
 # fetch_media logs <-> the command-line args of the process writing them, and its heartbeat stage
@@ -455,8 +455,7 @@ def activity_feed(state, n=25):
                         ("Media", "media.log"), ("Transcription", "transcribe.log"), ("Pipeline", "run_all.log"),
                         ("Index", "index.log"), ("Package", "package.log"), ("FB continue", "fb_continue.log"),
                         ("FB hist. media", "fb_history2.log"),
-                        ("OCR", "ocr.log"), ("OCR 1", "ocr_0.log"), ("OCR 2", "ocr_1.log"), ("OCR 3", "ocr_2.log"),
-                        ("Captions", "captions.log")):
+                        *ocr_logs(), ("Captions", "captions.log")):
         for l in read_tail(LOGS / name, 65536)[-n:]:
             m = re.match(r"(\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ) (.*)", l)
             if m:
@@ -544,8 +543,15 @@ def snapshot():
     return s
 
 
+def ocr_logs():
+    """[(label, log name)]: the single-worker log plus one per shard, however many workers run."""
+    shards = sorted(LOGS.glob("ocr_*.log"), key=lambda f: int(m.group(1)) if (m := re.fullmatch(r"ocr_(\d+)\.log", f.name)) else -1)
+    return [("OCR", "ocr.log")] + [(f"OCR {int(f.stem[4:]) + 1}", f.name) for f in shards if re.fullmatch(r"ocr_\d+", f.stem)]
+
+
 def LOGS_FOR():
     d = dict(LOG_FOR)
+    d["OCR"] = [name for _, name in ocr_logs()]
     if (LOGS / "fb_photos.log").exists():
         d["IG/FB media"] = d["IG/FB media"] + ["fb_photos.log"]
     return d
